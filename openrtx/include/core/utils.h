@@ -8,6 +8,7 @@
 #define UTILS_H
 
 #include "core/datatypes.h"
+#include "interfaces/platform.h"
 #include <stdint.h>
 #include <stddef.h>
 
@@ -118,6 +119,14 @@ static inline int32_t fixedPointToCoord(const int32_t value, const uint8_t unit)
 
     return tmp;
 }
+
+/**
+ * Checks if a frequency is within the supported hardware limits of a radio.
+ *
+ * @param freq: The frequency to be checked
+ * @return boolean value indicating whether the frequency is valid
+ */
+bool freqCheckLimits(freq_t freq);
 
 #ifdef __cplusplus
 }

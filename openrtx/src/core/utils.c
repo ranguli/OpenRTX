@@ -93,3 +93,25 @@ uint8_t ctcssFreqToIndex(const uint16_t freq)
 
     return 255;
 }
+
+bool freqCheckLimits(freq_t freq)
+{
+
+    bool valid = false;
+    const hwInfo_t* hwinfo = platform_getHwInfo();
+    if(hwinfo->vhf_band)
+    {
+        // hwInfo_t frequencies are in MHz
+        if(freq >= (hwinfo->vhf_minFreq * 1000000) &&
+           freq <= (hwinfo->vhf_maxFreq * 1000000))
+        valid = true;
+    }
+    if(hwinfo->uhf_band)
+    {
+        // hwInfo_t frequencies are in MHz
+        if(freq >= (hwinfo->uhf_minFreq * 1000000) &&
+           freq <= (hwinfo->uhf_maxFreq * 1000000))
+        valid = true;
+    }
+    return valid;
+}
