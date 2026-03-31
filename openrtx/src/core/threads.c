@@ -81,8 +81,11 @@ void *ui_threadFunc(void *arg)
             rtx_cfg.txTone      = ctcss_tone[state.channel.fm.txTone];
             rtx_cfg.toneEn      = state.tone_enabled;
 
-            // Enable Tx if channel allows it and we are in UI main screen
-            rtx_cfg.txDisable = state.channel.rx_only || state.txDisable;
+            // Enable Tx if channel allows it, we are in UI main screen,
+            // and the requested Tx frequency is within the hardware
+            // limits of the radio
+            rtx_cfg.txDisable = state.channel.rx_only || state.txDisable
+                || !freqCheckLimits(rtx_cfg.txFrequency);
 
             // Copy new M17 CAN, source and destination addresses
             rtx_cfg.can = state.settings.m17_can;
