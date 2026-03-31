@@ -21,7 +21,22 @@
 #include "core/beeps.h"
 #include "interfaces/cps_io.h"
 
-const uint16_t BOOT_MELODY[] = {400, 3, 600, 3, 800, 3, 0, 0};
+#define Db5 554
+#define D5  587
+#define E5  659
+#define Gb5 740
+#define Ab5 831
+#define A5  880
+#define B5  988
+#define Db6 1109
+#define D6  1175
+#define E6  1319
+
+#define H 20
+#define Q 10
+#define E 5
+
+const uint16_t BOOT_MELODY[] = {E6, E, D5, E, Gb5, Q, Ab5, Q, Db6, E, B5, E, D5, Q, E5, Q, B5, E, A5, E, Db5, Q, E5, Q, A5, H, 0, 0};
 
 static void clearCurrPromptIfNeeded(const vpQueueFlags_t flags)
 {
