@@ -354,6 +354,18 @@ int _ui_getRadioValueName(char *buf, uint8_t max_len, uint8_t index)
         return 0;
     }
 
+    if(index == R_TX_TIMEOUT)
+    {
+        static const char *tx_timeout_values[] =
+        {
+            "Off", "30 s", "60 s", "120 s", "180 s",
+        };
+
+        sniprintf(buf, max_len, "%s",
+                  tx_timeout_values[last_state.settings.tx_timeout]);
+        return 0;
+    }
+
     // Return an x.y string
     uint32_t value  = 0;
     switch(index)

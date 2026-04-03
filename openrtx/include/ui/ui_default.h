@@ -135,6 +135,7 @@ enum settingsRadioItems
     R_OFFSET,
     R_DIRECTION,
     R_STEP,
+    R_TX_TIMEOUT,
 };
 
 enum settingsM17Items

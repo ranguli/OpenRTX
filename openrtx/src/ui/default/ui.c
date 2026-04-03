@@ -164,6 +164,7 @@ const char *settings_radio_items[] =
     "Offset",
     "Direction",
     "Step",
+    "TX Timeout",
 };
 
 const char * settings_m17_items[] =
@@ -2256,6 +2257,21 @@ void ui_updateFSM(bool *sync_rtx)
                                 state.step_index += n_freq_steps;
                                 state.step_index--;
                                 state.step_index %= n_freq_steps;
+                            }
+                            break;
+                        case R_TX_TIMEOUT:
+                            if(msg.keys & KEY_UP || msg.keys & KEY_RIGHT || msg.keys & KNOB_RIGHT)
+                            {
+                                state.settings.tx_timeout++;
+                                if(state.settings.tx_timeout > TOT_180S)
+                                    state.settings.tx_timeout = TOT_OFF;
+                            }
+                            else if(msg.keys & KEY_DOWN || msg.keys & KEY_LEFT || msg.keys & KNOB_LEFT)
+                            {
+                                if(state.settings.tx_timeout == TOT_OFF)
+                                    state.settings.tx_timeout = TOT_180S;
+                                else
+                                    state.settings.tx_timeout--;
                             }
                             break;
                         default:
