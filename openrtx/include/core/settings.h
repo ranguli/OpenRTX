@@ -31,6 +31,16 @@ typedef enum
 }
 display_timer_t;
 
+typedef enum
+{
+    TOT_OFF  = 0,
+    TOT_30S  = 1,
+    TOT_60S  = 2,
+    TOT_120S = 3,
+    TOT_180S = 4,
+}
+tx_timeout_t;
+
 typedef struct
 {
     uint8_t brightness;           // Display brightness
@@ -45,7 +55,7 @@ typedef struct
     uint8_t vpLevel         : 3,  // Voice prompt level
             vpPhoneticSpell : 1,  // Phonetic spell enabled
             macroMenuLatch  : 1,  // Automatic latch of macro menu
-            _reserved       : 3;
+            tx_timeout      : 3;  // Transmit timeout timer
     bool    m17_can_rx;           // Check M17 CAN on RX
     char    m17_dest[10];         // M17 destination
     bool    showBatteryIcon;      // Battery display true: icon, false: percentage
@@ -73,7 +83,7 @@ static const settings_t default_settings =
     0,                            // Voice prompts off
     0,                            // Phonetic spell off
     1,                            // Automatic latch of macro menu enabled
-    0,                            // not used
+    TOT_OFF,                      // Transmit timeout off
     false,                        // Check M17 CAN on RX
     "",                           // Empty M17 destination
     false,                        // Display battery icon
