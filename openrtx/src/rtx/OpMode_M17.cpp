@@ -351,7 +351,7 @@ void OpMode_M17::txState(rtxStatus_t *const status)
     codec_popFrame(dataFrame.data(),     true);
     codec_popFrame(dataFrame.data() + 8, true);
 
-    if(platform_getPttStatus() == false)
+    if((platform_getPttStatus() == false) || (status->txDisable != 0))
     {
         lastFrame = true;
         startRx   = true;

@@ -287,6 +287,11 @@ static bool redraw_needed = true;
 static bool standby = false;
 static long long last_event_tick = 0;
 
+// Transmit timeout timer state
+static long long tot_start_tick = 0;
+static bool      tot_active     = false;
+static bool      tot_triggered  = false;
+
 // UI event queue
 static uint8_t evQueue_rdPos;
 static uint8_t evQueue_wrPos;
@@ -1363,6 +1368,18 @@ static vpGPSInfoFlags_t GetGPSDirectionOrSpeedChanged()
 }
 #endif // CONFIG_GPS
 
+static long long _ui_getTxTimeoutMs(uint8_t tx_timeout)
+{
+    switch(tx_timeout)
+    {
+        case TOT_30S:  return  30000;
+        case TOT_60S:  return  60000;
+        case TOT_120S: return 120000;
+        case TOT_180S: return 180000;
+        default:       return 0;
+    }
+}
+
 void ui_updateFSM(bool *sync_rtx)
 {
     // Check for events
@@ -1464,8 +1481,8 @@ void ui_updateFSM(bool *sync_rtx)
             // VFO screen
             case MAIN_VFO:
             {
-                // Enable Tx in MAIN_VFO mode
-                if (state.txDisable)
+                // Enable Tx in MAIN_VFO mode (but not if TX timeout has triggered)
+                if (state.txDisable && !tot_triggered)
                 {
                     state.txDisable = false;
                     *sync_rtx = true;
@@ -1661,8 +1678,8 @@ void ui_updateFSM(bool *sync_rtx)
                 break;
             // MEM screen
             case MAIN_MEM:
-                // Enable Tx in MAIN_MEM mode
-                if (state.txDisable)
+                // Enable Tx in MAIN_MEM mode (but not if TX timeout has triggered)
+                if (state.txDisable && !tot_triggered)
                 {
                     state.txDisable = false;
                     *sync_rtx = true;
@@ -2601,6 +2618,46 @@ void ui_updateFSM(bool *sync_rtx)
     }
     else if(event.type == EVENT_STATUS)
     {
+        // Transmit timeout timer enforcement
+        if(txOngoing && state.settings.tx_timeout != TOT_OFF)
+        {
+            if(!tot_active)
+            {
+                tot_start_tick = now;
+                tot_active     = true;
+                tot_triggered  = false;
+            }
+            else if(!tot_triggered)
+            {
+                long long timeout_ms = _ui_getTxTimeoutMs(state.settings.tx_timeout);
+                if((now - tot_start_tick) >= timeout_ms)
+                {
+                    state.txDisable = true;
+                    *sync_rtx       = true;
+                    tot_triggered   = true;
+                }
+            }
+        }
+        else if(tot_active)
+        {
+            // PTT was released. If TOT had triggered a lockout, re-enable TX
+            // now that the user has unkeyed.
+            bool wasTotTriggered = tot_triggered;
+            tot_active    = false;
+            tot_triggered = false;
+
+            if(wasTotTriggered && state.txDisable)
+            {
+                bool inMemOrVfo = (state.ui_screen == MAIN_VFO) ||
+                                  (state.ui_screen == MAIN_MEM);
+                if(inMemOrVfo)
+                {
+                    state.txDisable = false;
+                    *sync_rtx       = true;
+                }
+            }
+        }
+
 #ifdef CONFIG_GPS
         if ((state.ui_screen == MENU_GPS) &&
             (!vp_isPlaying()) &&

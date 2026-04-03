@@ -127,7 +127,7 @@ void OpMode_FM::update(rtxStatus_t *const status, const bool newCfg)
         status->opStatus = TX;
     }
 
-    if(!platform_getPttStatus() && (status->opStatus == TX))
+    if((!platform_getPttStatus() || (status->txDisable != 0)) && (status->opStatus == TX))
     {
         audioPath_release(txAudioPath);
         radio_disableRtx();
