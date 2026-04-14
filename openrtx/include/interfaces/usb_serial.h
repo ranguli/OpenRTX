@@ -27,7 +27,8 @@ void usb_serial_init(void);
 void usb_serial_terminate(void);
 
 /**
- * Service the USB stack. Must be called regularly from the main thread.
+ * Service the USB stack and flush any pending transmit data.
+ * Must be called regularly from exactly one thread (the main thread).
  */
 void usb_serial_task(void);
 
@@ -44,11 +45,21 @@ uint32_t usb_serial_available(void);
 /**
  * Write data to the USB CDC port.
  *
- * Blocks until all bytes are accepted or a 500 ms timeout elapses.
+ * Blocking: execution does not return until all bytes have been written
+ * through the CDC TX FIFO and flushed to the USB endpoint.
+ *
+ * Returns -1 immediately (without writing any data) if the USB device is
+ * not mounted, avoiding an indefinite block when the cable is unplugged.
+ * Also returns -1 if no forward progress is made within ~50 ms (transfer
+ * stalled while mounted), clearing the TX FIFO before returning.
+ *
+ * Thread-safe: concurrent callers are serialised by an internal mutex.
+ * Do not call this function from within a tinyUSB callback, as it may
+ * call tud_task() internally when the CDC TX FIFO is full.
  *
  * \param buf  data to send.
  * \param len  number of bytes to send.
- * \return number of bytes written, or -1 on error/timeout.
+ * \return len on success, or -1 on error.
  */
 ssize_t usb_serial_write(const void *buf, size_t len);
 
