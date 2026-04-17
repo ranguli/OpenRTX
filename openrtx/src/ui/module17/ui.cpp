@@ -22,6 +22,7 @@
 
 static UIContext uiCtx(layout);
 static ArrowInputControl callsignInput;
+static ArrowInputControl messageInput;
 
 /* UI main screen functions, their implementation is in "ui_main.cpp" */
 extern void _ui_drawMainBackground();
@@ -51,6 +52,16 @@ extern void _ui_drawSettingsM17(ui_state_t* ui_state);
 extern void _ui_drawSettingsModule17(ui_state_t* ui_state);
 extern void _ui_drawSettingsReset2Defaults(ui_state_t* ui_state);
 extern bool _ui_drawMacroMenu(ui_state_t* ui_state);
+
+void _ui_drawCallsignInput(bool overlay)
+{
+    callsignInput.draw(uiCtx, overlay);
+}
+
+void _ui_drawMessageInput(bool overlay)
+{
+    messageInput.draw(uiCtx, overlay);
+}
 
 const char *menu_items[] =
 {
@@ -128,8 +139,6 @@ const char *authors[] =
     "Morgan ON4MOD",
     "Marco DM4RCO"
 };
-
-static const char symbols_callsign[] = "_ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890/-.";
 
 // Calculate number of menu entries
 const uint8_t menu_num = sizeof(menu_items)/sizeof(menu_items[0]);
@@ -435,55 +444,6 @@ static void _ui_menuBack(uint8_t prev_state)
     }
 }
 
-static void _ui_textInputReset(char *buf)
-{
-    ui_state.input_number = 0;
-    ui_state.input_position = 0;
-    ui_state.input_set = 0;
-    ui_state.last_keypress = 0;
-    memset(buf, 0, 9);
-}
-
-static void _ui_textInputArrows(char *buf, uint8_t max_len, kbd_msg_t msg)
-{
-    if(ui_state.input_position >= max_len)
-        return;
-
-    uint8_t num_symbols = 0;
-    num_symbols = strlen(symbols_callsign);
-
-    if (msg.keys & KEY_RIGHT)
-    {
-        if (ui_state.input_position < (max_len - 1))
-        {
-            ui_state.input_position = ui_state.input_position + 1;
-            ui_state.input_set = 0;
-        }
-    }
-    else if (msg.keys & KEY_LEFT)
-    {
-        if (ui_state.input_position > 0)
-        {
-            buf[ui_state.input_position] = '\0';
-            ui_state.input_position = ui_state.input_position - 1;
-        }
-
-        // get index of current selected character in symbol table
-        ui_state.input_set = strcspn(symbols_callsign, &buf[ui_state.input_position]);
-    }
-    else if (msg.keys & KEY_UP)
-        ui_state.input_set = (ui_state.input_set + 1) % num_symbols;
-    else if (msg.keys & KEY_DOWN)
-        ui_state.input_set = ui_state.input_set==0 ? num_symbols-1 : ui_state.input_set-1;
-
-    buf[ui_state.input_position] = symbols_callsign[ui_state.input_set];
-}
-
-static void _ui_textInputConfirm(char *buf)
-{
-    buf[ui_state.input_position + 1] = '\0';
-}
-
 void ui_saveState()
 {
     last_state = state;
@@ -525,19 +485,17 @@ void ui_updateFSM(bool *sync_rtx)
                 }
                 else if(ui_state.edit_message)
                 {
-                    if(msg.keys & KEY_ENTER)
+                    InputResult result = messageInput.handleKey(uiCtx, event);
+                    if(result == InputResult::Confirmed)
                     {
-                        _ui_textInputConfirm(ui_state.new_message);
-                        // Save selected message and disable input mode
                         strncpy(state.settings.M17_meta_text, ui_state.new_message, 52);
                         ui_state.edit_message = false;
                         *sync_rtx = true;
                     }
-                    else if(msg.keys & KEY_ESC)
-                        // Discard selected message and disable input mode
+                    else if(result == InputResult::Cancelled)
+                    {
                         ui_state.edit_message = false;
-                    else
-                        _ui_textInputArrows(ui_state.new_message, 52, msg);
+                    }
                 }
                 else
                 {
@@ -551,7 +509,7 @@ void ui_updateFSM(bool *sync_rtx)
                     else if (msg.keys & KEY_RIGHT)
                     {
                         ui_state.edit_mode = true;
-                        callsignInput.start(ui_state.new_callsign, 9, arrowCallsignSymbols);
+                        callsignInput.start(ui_state.new_callsign, 9, arrowCallsignSymbols, layout.input_font);
                     }
                 }
                 break;
@@ -692,19 +650,17 @@ void ui_updateFSM(bool *sync_rtx)
                 }
                 else if(ui_state.edit_message)
                 {
-                    if(msg.keys & KEY_ENTER)
+                    InputResult result = messageInput.handleKey(uiCtx, event);
+                    if(result == InputResult::Confirmed)
                     {
-                        _ui_textInputConfirm(ui_state.new_message);
-                        // Save selected message and disable input mode
                         strncpy(state.settings.M17_meta_text, ui_state.new_message, 52);
                         ui_state.edit_message = false;
                         ui_state.edit_mode = false;
                     }
-                    else if(msg.keys & KEY_ESC)
-                        // Discard selected message and disable input mode
+                    else if(result == InputResult::Cancelled)
+                    {
                         ui_state.edit_message = false;
-                    else
-                        _ui_textInputArrows(ui_state.new_message, 52, msg);
+                    }
                 }
                 else
                 {
@@ -744,12 +700,12 @@ void ui_updateFSM(bool *sync_rtx)
                             // Enable callsign input
                             case M_CALLSIGN:
                                 ui_state.edit_mode = true;
-                                callsignInput.start(ui_state.new_callsign, 9, arrowCallsignSymbols);
+                                callsignInput.start(ui_state.new_callsign, 9, arrowCallsignSymbols, layout.input_font);
                                 break;
                             // Enable meta text input
                             case M_METATEXT:
                                 ui_state.edit_message = true;
-                                _ui_textInputReset(ui_state.new_message);
+                                messageInput.start(ui_state.new_message, 52, arrowTextSymbols, layout.message_font);
                                 break;
                             default:
                                 state.ui_screen = SETTINGS_M17;
