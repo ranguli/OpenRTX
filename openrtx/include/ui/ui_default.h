@@ -7,23 +7,12 @@
 #ifndef UI_DEFAULT_H
 #define UI_DEFAULT_H
 
-#include <stdbool.h>
+#include "ui/ui_common.h"
 #include "core/state.h"
-#include "core/graphics.h"
 #include "interfaces/keyboard.h"
-#include <stdint.h>
 #include "core/event.h"
 #include "hwconfig.h"
 #include "core/ui.h"
-
-// Maximum menu entry length
-#define MAX_ENTRY_LEN 21
-// Frequency digits
-#define FREQ_DIGITS 7
-// Time & Date digits
-#define TIMEDATE_DIGITS 10
-// Max number of UI events
-#define MAX_NUM_EVENTS 16
 
 enum uiScreen
 {
@@ -53,12 +42,6 @@ enum uiScreen
     SETTINGS_ACCESSIBILITY,
     SETTINGS_RESET2DEFAULTS,
     LOW_BAT
-};
-
-enum SetRxTx
-{
-    SET_RX = 0,
-    SET_TX
 };
 
 // This enum is needed to have item numbers that match
@@ -92,12 +75,6 @@ enum settingsItems
     S_FM,
     S_ACCESSIBILITY,
     S_RESET2DEFAULTS,
-};
-
-enum backupRestoreItems
-{
-    BR_BACKUP = 0,
-    BR_RESTORE
 };
 
 enum displayItems
@@ -262,9 +239,4 @@ extern const uint8_t settings_accessibility_num;
 extern const uint8_t backup_restore_num;
 extern const uint8_t info_num;
 extern const uint8_t author_num;
-extern const color_t color_black;
-extern const color_t color_grey;
-extern const color_t color_white;
-extern const color_t yellow_fab413;
-
 #endif /* UI_DEFAULT_H */

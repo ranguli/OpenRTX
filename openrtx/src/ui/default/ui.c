@@ -65,6 +65,7 @@
 #include "hwconfig.h"
 #include "core/voicePromptUtils.h"
 #include "core/beeps.h"
+#include "ui/ui_events.h"
 
 /* UI main screen functions, their implementation is in "ui_main.c" */
 extern void _ui_drawMainBackground();
@@ -285,12 +286,6 @@ static bool redraw_needed = true;
 
 static bool standby = false;
 static long long last_event_tick = 0;
-
-// UI event queue
-static uint8_t evQueue_rdPos;
-static uint8_t evQueue_wrPos;
-static event_t evQueue[MAX_NUM_EVENTS];
-
 
 static void _ui_calculateLayout(layout_t *layout)
 {
@@ -1375,13 +1370,8 @@ static vpGPSInfoFlags_t GetGPSDirectionOrSpeedChanged()
 
 void ui_updateFSM(bool *sync_rtx)
 {
-    // Check for events
-    if(evQueue_wrPos == evQueue_rdPos) return;
-
-    // Pop an event from the queue
-    uint8_t newTail = (evQueue_rdPos + 1) % MAX_NUM_EVENTS;
-    event_t event   = evQueue[evQueue_rdPos];
-    evQueue_rdPos   = newTail;
+    event_t event;
+    if(!ui_popEvent(&event)) return;
 
     // There is some event to process, we need an UI redraw.
     // UI redraw request is cancelled if we're in standby mode.
@@ -2752,24 +2742,6 @@ bool ui_updateGUI()
     }
 
     redraw_needed = false;
-    return true;
-}
-
-bool ui_pushEvent(const uint8_t type, const uint32_t data)
-{
-    uint8_t newHead = (evQueue_wrPos + 1) % MAX_NUM_EVENTS;
-
-    // Queue is full
-    if(newHead == evQueue_rdPos) return false;
-
-    // Preserve atomicity when writing the new element into the queue.
-    event_t event;
-    event.type    = type;
-    event.payload = data;
-
-    evQueue[evQueue_wrPos] = event;
-    evQueue_wrPos = newHead;
-
     return true;
 }
 
