@@ -18,8 +18,10 @@
 #include "core/input.h"
 #include "hwconfig.h"
 #include "ui/ui_events.h"
+#include "ui/ui_strings.h"
 #include "ui/Screen.hpp"
 #include "ui/ui_draw.h"
+#include "ui/ui_nav.h"
 
 // module17-variant-specific draw functions and helpers
 extern "C" {
@@ -126,11 +128,7 @@ const color_t yellow_fab413 = {250, 180, 19, 255};
 
 state_t last_state;
 static ui_state_t ui_state;
-static Screen *current        = nullptr;
-static Screen *lastMainScreen = nullptr;
-static bool   *gSyncRtx       = nullptr;
-
-static void transition(Screen *next);
+static bool   *gSyncRtx = nullptr;
 
 // Forward declarations of static helpers used in Screen::handleInput bodies
 static void _ui_changeBrightness(int variation);
@@ -319,7 +317,7 @@ static SettingsReset2DefaultsScreen settingsReset2DefaultsScreen;
 
 static void transition(Screen *next)
 {
-    current                = next;
+    ui_nav_transition(next);
     ui_state.menu_selected = 0;
 }
 
@@ -363,7 +361,7 @@ bool VfoScreen::handleInput(event_t ev)
     {
         if(msg.keys & KEY_ENTER)
         {
-            lastMainScreen = current;
+            ui_nav_setLastMain(ui_nav_current());
             transition(&menuTopScreen);
         }
         else if(msg.keys & KEY_RIGHT)
@@ -393,7 +391,7 @@ bool MenuTopScreen::handleInput(event_t ev)
         }
     }
     else if(msg.keys & KEY_ESC)
-        _ui_menuBack(lastMainScreen);
+        _ui_menuBack(ui_nav_lastMain());
     return true;
 }
 
@@ -658,9 +656,46 @@ bool SettingsReset2DefaultsScreen::handleInput(event_t ev)
 
 void ui_init()
 {
-    ui_state      = ui_state_t{};
-    current        = &vfoScreen;
-    lastMainScreen = &vfoScreen;
+    ui_state = ui_state_t{};
+    ui_nav_init(&vfoScreen);
+
+    // Refresh translatable menu strings from the active language table.
+    // Hardware-specific strings ("Shutdown", "Module 17", etc.) stay hardcoded.
+    menu_items[M_SETTINGS] = currentLanguage->settings;
+#ifdef CONFIG_GPS
+    menu_items[M_GPS]      = currentLanguage->gps;
+#endif
+    menu_items[M_INFO]     = currentLanguage->info;
+    menu_items[M_ABOUT]    = currentLanguage->about;
+
+    settings_items[S_DISPLAY]        = currentLanguage->display;
+#ifdef CONFIG_RTC
+    settings_items[S_TIMEDATE]       = currentLanguage->timeAndDate;
+#endif
+#ifdef CONFIG_GPS
+    settings_items[S_GPS]            = currentLanguage->gpsSettings;
+#endif
+    settings_items[S_M17]            = currentLanguage->m17;
+    settings_items[S_RESET2DEFAULTS] = currentLanguage->defaultSettings;
+
+    display_items[D_BRIGHTNESS] = currentLanguage->brightness;
+
+#ifdef CONFIG_GPS
+    settings_gps_items[G_ENABLED]  = currentLanguage->gpsEnabled;
+    settings_gps_items[G_SET_TIME] = currentLanguage->gpsSetTime;
+    settings_gps_items[G_TIMEZONE] = currentLanguage->UTCTimeZone;
+#endif
+
+    m17_items[M_CALLSIGN] = currentLanguage->callsign;
+    m17_items[M_METATEXT] = currentLanguage->metaText;
+    m17_items[M_CAN]      = currentLanguage->CAN;
+    m17_items[M_CAN_RX]   = currentLanguage->canRxCheck;
+
+    info_items[1] = currentLanguage->usedHeap;
+
+    authors[0] = currentLanguage->Niccolo;
+    authors[1] = currentLanguage->Silvano;
+    authors[2] = currentLanguage->Federico;
 }
 
 void ui_drawSplashScreen()
@@ -777,12 +812,12 @@ static void _ui_menuUp(uint8_t menu_entries)
     const hwInfo_t* hwinfo = platform_getHwInfo();
 
     // Hide the "shutdown" main menu entry for versions lower than 0.1e
-    if((hwinfo->hw_version < 1) && (current == (Screen*)&menuTopScreen))
+    if((hwinfo->hw_version < 1) && (ui_nav_current() == (Screen*)&menuTopScreen))
         maxEntries -= 1;
 
     // Hide the softpot menu entries if hardware does not have them
     uint8_t softpot = hwinfo->flags & MOD17_FLAGS_SOFTPOT;
-    if((softpot == 0) && (current == (Screen*)&settingsModule17Screen))
+    if((softpot == 0) && (ui_nav_current() == (Screen*)&settingsModule17Screen))
         maxEntries -= 2;
 
     if(ui_state.menu_selected > 0)
@@ -797,12 +832,12 @@ static void _ui_menuDown(uint8_t menu_entries)
    const hwInfo_t* hwinfo = platform_getHwInfo();
 
     // Hide the "shutdown" main menu entry for versions lower than 0.1e
-    if((hwinfo->hw_version < 1) && (current == (Screen*)&menuTopScreen))
+    if((hwinfo->hw_version < 1) && (ui_nav_current() == (Screen*)&menuTopScreen))
         maxEntries -= 1;
 
     // Hide the softpot menu entries if hardware does not have them
     uint8_t softpot = hwinfo->flags & MOD17_FLAGS_SOFTPOT;
-    if((softpot == 0) && (current == (Screen*)&settingsModule17Screen))
+    if((softpot == 0) && (ui_nav_current() == (Screen*)&settingsModule17Screen))
         maxEntries -= 2;
 
     if(ui_state.menu_selected < maxEntries)
@@ -879,16 +914,13 @@ void ui_updateFSM(bool *sync_rtx)
     if(!ui_popEvent(&event)) return;
 
     gSyncRtx = sync_rtx;
-    current->handleInput(event);
+    ui_nav_current()->handleInput(event);
 }
 
 bool ui_updateGUI()
 {
-    current->render();
+    ui_nav_current()->render();
 
     return true;
 }
 
-void ui_terminate()
-{
-}

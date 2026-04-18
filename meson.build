@@ -75,12 +75,13 @@ openrtx_inc = ['openrtx/include', 'platform']
 ## OpenRTX UI sources
 ##
 
-ui_src_common = ['openrtx/src/ui/common/ui_events.cpp']
+ui_src_common = ['openrtx/src/ui/common/ui_events.cpp',
+                 'openrtx/src/ui/common/ui_nav.cpp',
+                 'openrtx/src/ui/default/ui_strings.c']
 
 ui_src_default = ui_src_common + ['openrtx/src/ui/default/ui.cpp',
                   'openrtx/src/ui/default/ui_main.c',
-                  'openrtx/src/ui/default/ui_menu.c',
-                  'openrtx/src/ui/default/ui_strings.c']
+                  'openrtx/src/ui/default/ui_menu.c']
 
 ui_src_module17 = ui_src_common + ['openrtx/src/ui/module17/ui.cpp',
                    'openrtx/src/ui/module17/ui_main.c',

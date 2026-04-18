@@ -68,6 +68,7 @@
 #include "ui/ui_events.h"
 #include "ui/Screen.hpp"
 #include "ui/ui_draw.h"
+#include "ui/ui_nav.h"
 
 // default-variant-specific draw functions
 extern "C" {
@@ -84,7 +85,7 @@ void _ui_drawSettingsVoicePrompts(ui_state_t* ui_state);
 void _ui_drawSettingsRadio(ui_state_t* ui_state);
 void _ui_reset_menu_anouncement_tracking();
 } // extern "C" default-specific
-// TODO: get these from ui strings / currentLanguage
+
 const char *menu_items[] =
 {
     "Banks",
@@ -860,7 +861,6 @@ static bool _ui_exitStandby(long long now)
     return true;
 }
 
-// TODO: find a better home for this function
 int _ui_handleToneSelectScroll(bool direction_up)
 {
     bool tone_tx_enable = state.channel.fm.txToneEn;
@@ -1070,8 +1070,6 @@ static void _ui_menuDown(uint8_t menu_entries)
     vp_playMenuBeepIfNeeded(ui_state.menu_selected==0);
 }
 
-static void transition(Screen *next);  // defined after screen instances
-
 static void _ui_menuBack(Screen *prev)
 {
     if(ui_state.edit_mode)
@@ -1080,7 +1078,7 @@ static void _ui_menuBack(Screen *prev)
     }
     else
     {
-        transition(prev);
+        ui_nav_transition(prev);
         ui_state.menu_selected = 0;
         vp_playMenuBeepIfNeeded(true);
     }
@@ -1247,24 +1245,24 @@ static void _ui_numberInputDel(uint32_t *num)
 
 // ─── Screen subclass declarations ───────────────────────────────────────────
 
-class VfoScreen               : public Screen { public: bool handleInput(event_t) override; void render() override; };
+class VfoScreen               : public Screen { public: void enter() override; bool handleInput(event_t) override; void render() override; };
 class VfoInputScreen          : public Screen { public: bool handleInput(event_t) override; void render() override; };
-class MemScreen               : public Screen { public: bool handleInput(event_t) override; void render() override; };
+class MemScreen               : public Screen { public: void enter() override; bool handleInput(event_t) override; void render() override; };
 class MenuTopScreen           : public Screen { public: bool handleInput(event_t) override; void render() override; };
 class MenuBankScreen          : public Screen { public: bool handleInput(event_t) override; void render() override; };
 class MenuChannelScreen       : public Screen { public: bool handleInput(event_t) override; void render() override; };
 class MenuContactsScreen      : public Screen { public: bool handleInput(event_t) override; void render() override; };
 #ifdef CONFIG_GPS
-class MenuGpsScreen           : public Screen { public: bool handleInput(event_t) override; void render() override; };
+class MenuGpsScreen           : public Screen { public: void enter() override; bool handleInput(event_t) override; void render() override; };
 #endif
 class MenuSettingsScreen      : public Screen { public: bool handleInput(event_t) override; void render() override; };
 class MenuBackupRestoreScreen : public Screen { public: bool handleInput(event_t) override; void render() override; };
-class MenuBackupScreen        : public Screen { public: bool handleInput(event_t) override; void render() override; };
-class MenuRestoreScreen       : public Screen { public: bool handleInput(event_t) override; void render() override; };
+class MenuBackupScreen        : public Screen { public: void enter() override; bool handleInput(event_t) override; void render() override; };
+class MenuRestoreScreen       : public Screen { public: void enter() override; bool handleInput(event_t) override; void render() override; };
 class MenuInfoScreen          : public Screen { public: bool handleInput(event_t) override; void render() override; };
-class MenuAboutScreen         : public Screen { public: bool handleInput(event_t) override; void render() override; };
+class MenuAboutScreen         : public Screen { public: void enter() override; bool handleInput(event_t) override; void render() override; };
 #ifdef CONFIG_RTC
-class SettingsTimedateScreen    : public Screen { public: bool handleInput(event_t) override; void render() override; };
+class SettingsTimedateScreen    : public Screen { public: void enter() override; bool handleInput(event_t) override; void render() override; };
 class SettingsTimedateSetScreen : public Screen { public: bool handleInput(event_t) override; void render() override; };
 #endif
 class SettingsDisplayScreen      : public Screen { public: bool handleInput(event_t) override; void render() override; };
@@ -1273,7 +1271,7 @@ class SettingsGpsScreen          : public Screen { public: bool handleInput(even
 #endif
 class SettingsRadioScreen        : public Screen { public: bool handleInput(event_t) override; void render() override; };
 #ifdef CONFIG_M17
-class SettingsM17Screen          : public Screen { public: bool handleInput(event_t) override; void render() override; };
+class SettingsM17Screen          : public Screen { public: void enter() override; bool handleInput(event_t) override; void render() override; };
 #endif
 class SettingsFmScreen               : public Screen { public: bool handleInput(event_t) override; void render() override; };
 class SettingsAccessibilityScreen    : public Screen { public: bool handleInput(event_t) override; void render() override; };
@@ -1317,17 +1315,8 @@ static LowBatScreen                  lowBatScreen;
 
 // ─── Navigation state ───────────────────────────────────────────────────────
 
-static Screen *current        = &vfoScreen;
-static Screen *lastMainScreen = nullptr;
-static bool   *gSyncRtx       = nullptr;
-static bool    gF1Handled     = false;
-
-static void transition(Screen *next)
-{
-    current->exit();
-    next->enter();
-    current = next;
-}
+static bool   *gSyncRtx   = nullptr;
+static bool    gF1Handled = false;
 
 // ─── Render methods ─────────────────────────────────────────────────────────
 
@@ -1363,6 +1352,42 @@ void SettingsFmScreen::render()             { _ui_drawSettingsFM(&ui_state); }
 void SettingsAccessibilityScreen::render()  { _ui_drawSettingsAccessibility(&ui_state); }
 void SettingsReset2DefaultsScreen::render() { _ui_drawSettingsReset2Defaults(&ui_state); }
 void LowBatScreen::render()                 { _ui_drawLowBatteryScreen(); }
+
+// ─── enter() voice-prompt hooks ─────────────────────────────────────────────
+
+static const vpSummaryInfoFlags_t kVpSummaryFlags =
+    (vpSummaryInfoFlags_t)(vpChannelNameOrVFO | vpFrequencies | vpRadioMode);
+
+void VfoScreen::enter()
+{
+    vp_announceChannelSummary(&state.channel, 0, state.bank, kVpSummaryFlags);
+}
+
+void MemScreen::enter()
+{
+    vp_announceChannelSummary(&state.channel, state.channel_index + 1,
+                              state.bank, kVpSummaryFlags);
+}
+
+#ifdef CONFIG_GPS
+void MenuGpsScreen::enter()   { vp_announceGPSInfo(vpGPSAll); }
+#endif
+
+void MenuBackupScreen::enter()  { vp_announceBackupScreen(); }
+void MenuRestoreScreen::enter() { vp_announceRestoreScreen(); }
+void MenuAboutScreen::enter()   { vp_announceAboutScreen(); }
+
+#ifdef CONFIG_RTC
+void SettingsTimedateScreen::enter() { vp_announceSettingsTimeDate(); }
+#endif
+
+#ifdef CONFIG_M17
+void SettingsM17Screen::enter()
+{
+    vp_announceBuffer(&currentLanguage->callsign,
+                      false, true, state.settings.callsign);
+}
+#endif
 
 // ─── handleInput implementations ────────────────────────────────────────────
 
@@ -1411,8 +1436,8 @@ bool VfoScreen::handleInput(event_t ev)
     {
         if(msg.keys & KEY_ENTER)
         {
-            lastMainScreen = current;
-            transition(&menuTopScreen);
+            ui_nav_setLastMain(ui_nav_current());
+            ui_nav_transition(&menuTopScreen);
         }
         else if(msg.keys & KEY_ESC)
         {
@@ -1420,7 +1445,7 @@ bool VfoScreen::handleInput(event_t ev)
             int result = _ui_fsm_loadChannel(state.channel_index, gSyncRtx);
             if(result != -1)
             {
-                transition(&memScreen);
+                ui_nav_transition(&memScreen);
                 vp_announceChannelName(&state.channel, state.channel_index, queueFlags);
             }
         }
@@ -1474,7 +1499,7 @@ bool VfoScreen::handleInput(event_t ev)
         }
         else if(input_isNumberPressed(msg))
         {
-            transition(&vfoInputScreen);
+            ui_nav_transition(&vfoInputScreen);
             ui_state.input_position = 1;
             ui_state.input_set = SET_RX;
             vp_announceInputReceiveOrTransmit(false, vpqInit);
@@ -1501,7 +1526,7 @@ bool VfoInputScreen::handleInput(event_t ev)
     if(msg.keys & KEY_ENTER)
         _ui_fsm_confirmVFOInput(gSyncRtx);
     else if(msg.keys & KEY_ESC)
-        transition(&vfoScreen);
+        ui_nav_transition(&vfoScreen);
     else if(msg.keys & KEY_UP || msg.keys & KEY_DOWN)
     {
         if(ui_state.input_set == SET_RX)
@@ -1569,14 +1594,14 @@ bool MemScreen::handleInput(event_t ev)
     {
         if(msg.keys & KEY_ENTER)
         {
-            lastMainScreen = current;
-            transition(&menuTopScreen);
+            ui_nav_setLastMain(ui_nav_current());
+            ui_nav_transition(&menuTopScreen);
         }
         else if(msg.keys & KEY_ESC)
         {
             state.channel = state.vfo_channel;
             *gSyncRtx = true;
-            transition(&vfoScreen);
+            ui_nav_transition(&vfoScreen);
         }
         else if(msg.keys & KEY_HASH)
         {
@@ -1629,20 +1654,20 @@ bool MenuTopScreen::handleInput(event_t ev)
     {
         switch(ui_state.menu_selected)
         {
-            case M_BANK:     transition(&menuBankScreen);     break;
-            case M_CHANNEL:  transition(&menuChannelScreen);  break;
-            case M_CONTACTS: transition(&menuContactsScreen); break;
+            case M_BANK:     ui_nav_transition(&menuBankScreen);     break;
+            case M_CHANNEL:  ui_nav_transition(&menuChannelScreen);  break;
+            case M_CONTACTS: ui_nav_transition(&menuContactsScreen); break;
 #ifdef CONFIG_GPS
-            case M_GPS:      transition(&menuGpsScreen);      break;
+            case M_GPS:      ui_nav_transition(&menuGpsScreen);      break;
 #endif
-            case M_SETTINGS: transition(&menuSettingsScreen); break;
-            case M_INFO:     transition(&menuInfoScreen);     break;
-            case M_ABOUT:    transition(&menuAboutScreen);    break;
+            case M_SETTINGS: ui_nav_transition(&menuSettingsScreen); break;
+            case M_INFO:     ui_nav_transition(&menuInfoScreen);     break;
+            case M_ABOUT:    ui_nav_transition(&menuAboutScreen);    break;
         }
         ui_state.menu_selected = 0;
     }
     else if(msg.keys & KEY_ESC)
-        _ui_menuBack(lastMainScreen);
+        _ui_menuBack(ui_nav_lastMain());
     return true;
 }
 
@@ -1674,10 +1699,10 @@ bool MenuBankScreen::handleInput(event_t ev)
         if(result != -1)
         {
             state.bank = ui_state.menu_selected - 1;
-            if(lastMainScreen == &vfoScreen)
+            if(ui_nav_lastMain() == &vfoScreen)
                 state.vfo_channel = state.channel;
             _ui_fsm_loadChannel(0, gSyncRtx);
-            transition(&memScreen);
+            ui_nav_transition(&memScreen);
         }
     }
     else if(msg.keys & KEY_ESC)
@@ -1701,10 +1726,10 @@ bool MenuChannelScreen::handleInput(event_t ev)
     }
     else if(msg.keys & KEY_ENTER)
     {
-        if(lastMainScreen == &vfoScreen)
+        if(ui_nav_lastMain() == &vfoScreen)
             state.vfo_channel = state.channel;
         _ui_fsm_loadChannel(ui_state.menu_selected, gSyncRtx);
-        transition(&memScreen);
+        ui_nav_transition(&memScreen);
     }
     else if(msg.keys & KEY_ESC)
         _ui_menuBack(&menuTopScreen);
@@ -1765,20 +1790,20 @@ bool MenuSettingsScreen::handleInput(event_t ev)
     {
         switch(ui_state.menu_selected)
         {
-            case S_DISPLAY:         transition(&settingsDisplayScreen);   break;
+            case S_DISPLAY:         ui_nav_transition(&settingsDisplayScreen);   break;
 #ifdef CONFIG_RTC
-            case S_TIMEDATE:        transition(&settingsTimedateScreen);  break;
+            case S_TIMEDATE:        ui_nav_transition(&settingsTimedateScreen);  break;
 #endif
 #ifdef CONFIG_GPS
-            case S_GPS:             transition(&settingsGpsScreen);       break;
+            case S_GPS:             ui_nav_transition(&settingsGpsScreen);       break;
 #endif
-            case S_RADIO:           transition(&settingsRadioScreen);     break;
+            case S_RADIO:           ui_nav_transition(&settingsRadioScreen);     break;
 #ifdef CONFIG_M17
-            case S_M17:             transition(&settingsM17Screen);       break;
+            case S_M17:             ui_nav_transition(&settingsM17Screen);       break;
 #endif
-            case S_FM:              transition(&settingsFmScreen);        break;
-            case S_ACCESSIBILITY:   transition(&settingsAccessibilityScreen); break;
-            case S_RESET2DEFAULTS:  transition(&settingsReset2DefaultsScreen); break;
+            case S_FM:              ui_nav_transition(&settingsFmScreen);        break;
+            case S_ACCESSIBILITY:   ui_nav_transition(&settingsAccessibilityScreen); break;
+            case S_RESET2DEFAULTS:  ui_nav_transition(&settingsReset2DefaultsScreen); break;
             default: break;
         }
         ui_state.menu_selected = 0;
@@ -1802,8 +1827,8 @@ bool MenuBackupRestoreScreen::handleInput(event_t ev)
     {
         switch(ui_state.menu_selected)
         {
-            case BR_BACKUP:  transition(&menuBackupScreen);  break;
-            case BR_RESTORE: transition(&menuRestoreScreen); break;
+            case BR_BACKUP:  ui_nav_transition(&menuBackupScreen);  break;
+            case BR_RESTORE: ui_nav_transition(&menuRestoreScreen); break;
             default: break;
         }
         ui_state.menu_selected = 0;
@@ -1872,7 +1897,7 @@ bool SettingsTimedateScreen::handleInput(event_t ev)
 
     if(msg.keys & KEY_ENTER)
     {
-        transition(&settingsTimedateSetScreen);
+        ui_nav_transition(&settingsTimedateSetScreen);
         ui_state.input_position = 0;
         memset(&ui_state.new_timedate, 0, sizeof(datetime_t));
         vp_announceBuffer(&currentLanguage->timeAndDate, true, false, "dd/mm/yy");
@@ -1895,7 +1920,7 @@ bool SettingsTimedateSetScreen::handleInput(event_t ev)
         platform_setTime(utc_time);
         state.time = utc_time;
         vp_announceSettingsTimeDate();
-        transition(&settingsTimedateScreen);
+        ui_nav_transition(&settingsTimedateScreen);
     }
     else if(msg.keys & KEY_ESC)
         _ui_menuBack(&settingsTimedateScreen);
@@ -2372,7 +2397,7 @@ bool LowBatScreen::handleInput(event_t ev)
     msg.value = ev.payload;
     if(msg.keys)
     {
-        transition(&vfoScreen);
+        ui_nav_transition(&vfoScreen);
         state.emergency = true;
     }
     return true;
@@ -2385,6 +2410,85 @@ void ui_init()
     last_event_tick = getTick();
     redraw_needed = true;
     ui_state = ui_state_t{};
+    ui_nav_init(&vfoScreen);
+
+    // Refresh menu string arrays from the active language table.
+    menu_items[M_BANK]          = currentLanguage->banks;
+    menu_items[M_CHANNEL]       = currentLanguage->channels;
+    menu_items[M_CONTACTS]      = currentLanguage->contacts;
+#ifdef CONFIG_GPS
+    menu_items[M_GPS]           = currentLanguage->gps;
+#endif
+    menu_items[M_SETTINGS]      = currentLanguage->settings;
+    menu_items[M_INFO]          = currentLanguage->info;
+    menu_items[M_ABOUT]         = currentLanguage->about;
+
+    settings_items[S_DISPLAY]        = currentLanguage->display;
+#ifdef CONFIG_RTC
+    settings_items[S_TIMEDATE]       = currentLanguage->timeAndDate;
+#endif
+#ifdef CONFIG_GPS
+    settings_items[S_GPS]            = currentLanguage->gpsSettings;
+#endif
+    settings_items[S_RADIO]          = currentLanguage->radioSettings;
+#ifdef CONFIG_M17
+    settings_items[S_M17]            = currentLanguage->m17settings;
+#endif
+    settings_items[S_FM]             = currentLanguage->fm;
+    settings_items[S_ACCESSIBILITY]  = currentLanguage->accessibility;
+    settings_items[S_RESET2DEFAULTS] = currentLanguage->defaultSettings;
+
+#ifdef CONFIG_SCREEN_BRIGHTNESS
+    display_items[D_BRIGHTNESS] = currentLanguage->brightness;
+#endif
+#ifdef CONFIG_SCREEN_CONTRAST
+    display_items[D_CONTRAST]   = currentLanguage->contrast;
+#endif
+    display_items[D_TIMER]      = currentLanguage->timer;
+    display_items[D_BATTERY]    = currentLanguage->batteryIcon;
+
+#ifdef CONFIG_GPS
+    settings_gps_items[G_ENABLED] = currentLanguage->gpsEnabled;
+#  ifdef CONFIG_RTC
+    settings_gps_items[G_SET_TIME] = currentLanguage->gpsSetTime;
+    settings_gps_items[G_TIMEZONE] = currentLanguage->UTCTimeZone;
+#  endif
+#endif
+
+    settings_radio_items[R_OFFSET]    = currentLanguage->offset;
+    settings_radio_items[R_DIRECTION] = currentLanguage->direction;
+    settings_radio_items[R_STEP]      = currentLanguage->step;
+
+#ifdef CONFIG_M17
+    settings_m17_items[M17_CALLSIGN] = currentLanguage->callsign;
+    settings_m17_items[M17_METATEXT] = currentLanguage->metaText;
+    settings_m17_items[M17_CAN]      = currentLanguage->CAN;
+    settings_m17_items[M17_CAN_RX]   = currentLanguage->canRxCheck;
+#endif
+
+    settings_fm_items[CTCSS_Tone]    = currentLanguage->CTCSSTone;
+    settings_fm_items[CTCSS_Enabled] = currentLanguage->CTCSSEn;
+
+    settings_accessibility_items[A_MACRO_LATCH] = currentLanguage->macroLatching;
+    settings_accessibility_items[A_LEVEL]       = currentLanguage->voice;
+    settings_accessibility_items[A_PHONETIC]    = currentLanguage->phonetic;
+
+    backup_restore_items[0] = currentLanguage->backup;
+    backup_restore_items[1] = currentLanguage->restore;
+
+    info_items[1] = currentLanguage->batteryVoltage;
+    info_items[2] = currentLanguage->batteryCharge;
+    info_items[3] = currentLanguage->RSSI;
+    info_items[4] = currentLanguage->usedHeap;
+    info_items[5] = currentLanguage->band;
+    info_items[6] = currentLanguage->VHF;
+    info_items[7] = currentLanguage->UHF;
+
+    authors[0] = currentLanguage->Niccolo;
+    authors[1] = currentLanguage->Silvano;
+    authors[2] = currentLanguage->Federico;
+    authors[3] = currentLanguage->Fred;
+    authors[4] = currentLanguage->Joseph;
 }
 
 void ui_drawSplashScreen()
@@ -2567,10 +2671,10 @@ void ui_updateFSM(bool *sync_rtx)
 
         gSyncRtx   = sync_rtx;
         gF1Handled = false;
-        current->handleInput(event);
+        ui_nav_current()->handleInput(event);
 
         // Enable Tx only if in MAIN_VFO or MAIN_MEM states
-        bool inMemOrVfo = (current == &vfoScreen) || (current == &memScreen);
+        bool inMemOrVfo = (ui_nav_current() == &vfoScreen) || (ui_nav_current() == &memScreen);
         if((macro_menu == true) || ((inMemOrVfo == false) && (state.txDisable == false)))
         {
             state.txDisable = true;
@@ -2578,7 +2682,6 @@ void ui_updateFSM(bool *sync_rtx)
         }
         if(!gF1Handled && (msg.keys & KEY_F1) && (state.settings.vpLevel > vpBeep))
             vp_replayLastPrompt();
-        // TODO Phase 5: restore screen-change voice announcement via Screen::enter()
         if((msg.keys & 0xffff) && (state.settings.vpLevel == vpBeep))
             vp_beep(BEEP_KEY_GENERIC, SHORT_BEEP);
         if(msg.keys & KEY_ESC)
@@ -2588,7 +2691,7 @@ void ui_updateFSM(bool *sync_rtx)
     else if(event.type == EVENT_STATUS)
     {
 #ifdef CONFIG_GPS
-        if ((current == &menuGpsScreen) &&
+        if ((ui_nav_current() == &menuGpsScreen) &&
             (!vp_isPlaying()) &&
             (state.settings.vpLevel > vpLow) &&
             (!txOngoing && !rtx_rxSquelchOpen()))
@@ -2617,7 +2720,7 @@ bool ui_updateGUI()
     if(redraw_needed == false)
         return false;
 
-    current->render();
+    ui_nav_current()->render();
 
     // If MACRO menu is active draw it
     if(macro_menu)
@@ -2630,6 +2733,3 @@ bool ui_updateGUI()
     return true;
 }
 
-void ui_terminate()
-{
-}
