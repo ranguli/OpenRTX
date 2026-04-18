@@ -80,13 +80,15 @@ ui_src_default = ['openrtx/src/ui/default/ui.cpp',
                   'openrtx/src/ui/default/ui_menu.cpp',
                   'openrtx/src/ui/default/ui_strings.c',
                   'openrtx/src/ui/default/T9InputControl.cpp',
-                  'openrtx/src/ui/default/ScreenManager.cpp']
+                  'openrtx/src/ui/default/ScreenManager.cpp',
+                  'openrtx/src/ui/default/screens/MenuAboutScreen.cpp']
 
 ui_src_module17 = ['openrtx/src/ui/module17/ui.cpp',
                    'openrtx/src/ui/module17/ui_main.cpp',
                    'openrtx/src/ui/module17/ui_menu.cpp',
                    'openrtx/src/ui/module17/ArrowInputControl.cpp',
-                   'openrtx/src/ui/default/ScreenManager.cpp']
+                   'openrtx/src/ui/default/ScreenManager.cpp',
+                   'openrtx/src/ui/default/screens/MenuAboutScreen.cpp']
 
 ##
 ## Selection of main entrypoint

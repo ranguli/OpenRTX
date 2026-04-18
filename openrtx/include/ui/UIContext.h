@@ -14,17 +14,17 @@
 #endif
 
 /**
- * Shared context passed to InputControl methods.
+ * Shared context passed to InputControl and Screen methods.
  *
- * Currently holds only a reference to the global layout.  As the UI
- * migrates to C++ Screen objects, this struct will grow to include
- * redraw flags, event queues, and other per-frame state so that
- * controls can be rendered and updated without reaching into globals.
+ * Holds a reference to the global layout and a snapshot of the
+ * per-frame UI state.  Screens read and modify ui_state; the
+ * caller copies it back after handleInput() / draw() returns.
  */
 struct UIContext {
     const layout_t &layout;
+    ui_state_t ui_state;
 
-    explicit UIContext(const layout_t &l) : layout(l)
+    explicit UIContext(const layout_t &l) : layout(l), ui_state{}
     {
     }
 };

@@ -66,9 +66,11 @@
 #include "core/voicePromptUtils.h"
 #include "core/beeps.h"
 #include "ui/UIContext.h"
+#include "ui/ScreenManager.h"
 #include "ui/T9InputControl.h"
 
 static UIContext uiCtx(layout);
+static ScreenManager screenMgr;
 static T9InputControl callsignInput;
 static T9InputControl messageInput;
 
@@ -97,7 +99,6 @@ extern void _ui_drawMenuBackupRestore(ui_state_t *ui_state);
 extern void _ui_drawMenuBackup(ui_state_t *ui_state);
 extern void _ui_drawMenuRestore(ui_state_t *ui_state);
 extern void _ui_drawMenuInfo(ui_state_t *ui_state);
-extern void _ui_drawMenuAbout(ui_state_t *ui_state);
 #ifdef CONFIG_RTC
 extern void _ui_drawSettingsTimeDate();
 extern void _ui_drawSettingsTimeDateSet(ui_state_t *ui_state);
@@ -185,11 +186,6 @@ const char *info_items[] = {
 #endif
 };
 
-const char *authors[] = { "Niccolo' IU2KIN", "Silvano IU2KWO",
-                          "Federico IU2NUO", "Fred IU2NRO",
-                          "Joseph VK7JS",    "Morgan ON4MOD",
-                          "Marco DM4RCO" };
-
 // Calculate number of menu entries
 const uint8_t menu_num = sizeof(menu_items) / sizeof(menu_items[0]);
 const uint8_t settings_num = sizeof(settings_items) / sizeof(settings_items[0]);
@@ -212,7 +208,6 @@ const uint8_t settings_accessibility_num =
 const uint8_t backup_restore_num = sizeof(backup_restore_items)
                                  / sizeof(backup_restore_items[0]);
 const uint8_t info_num = sizeof(info_items) / sizeof(info_items[0]);
-const uint8_t author_num = sizeof(authors) / sizeof(authors[0]);
 
 const color_t color_black = { 0, 0, 0, 255 };
 const color_t color_grey = { 60, 60, 60, 255 };
@@ -1096,6 +1091,9 @@ void ui_init()
     layout_ready = true;
     // Initialize ui_state to all zeroes
     memset(&ui_state, 0, sizeof(ui_state));
+
+    extern Screen *getMenuAboutScreen();
+    screenMgr.registerScreen(MENU_ABOUT, getMenuAboutScreen());
 }
 
 void ui_drawSplashScreen()
@@ -1734,15 +1732,13 @@ void ui_updateFSM(bool *sync_rtx)
                 else if (msg.keys & KEY_ESC)
                     _ui_menuBack(MENU_TOP);
                 break;
-            // About screen, scroll without rollover
+            // About screen — delegated to ScreenManager
             case MENU_ABOUT:
-                if (msg.keys & KEY_UP || msg.keys & KNOB_LEFT) {
-                    if (ui_state.menu_selected > 0)
-                        ui_state.menu_selected -= 1;
-                } else if (msg.keys & KEY_DOWN || msg.keys & KNOB_RIGHT)
-                    ui_state.menu_selected += 1;
-                else if (msg.keys & KEY_ESC)
-                    _ui_menuBack(MENU_TOP);
+                uiCtx.ui_state = ui_state;
+                if (screenMgr.activeId() != MENU_ABOUT)
+                    screenMgr.setActive(MENU_ABOUT, uiCtx);
+                screenMgr.handleInput(uiCtx, event, sync_rtx);
+                ui_state = uiCtx.ui_state;
                 break;
 #ifdef CONFIG_RTC
             // Time&Date settings screen
@@ -2365,9 +2361,13 @@ bool ui_updateGUI()
         case MENU_INFO:
             _ui_drawMenuInfo(&ui_state);
             break;
-        // About menu screen
+        // About menu screen — delegated to ScreenManager
         case MENU_ABOUT:
-            _ui_drawMenuAbout(&ui_state);
+            uiCtx.ui_state = ui_state;
+            if (screenMgr.activeId() != MENU_ABOUT)
+                screenMgr.setActive(MENU_ABOUT, uiCtx);
+            screenMgr.draw(uiCtx);
+            ui_state = uiCtx.ui_state;
             break;
 #ifdef CONFIG_RTC
         // Time&Date settings screen
