@@ -214,7 +214,7 @@ typedef struct ui_state_t
 }
 ui_state_t;
 
-extern layout_t layout;
+extern const layout_t layout;
 extern state_t last_state;
 extern bool    macro_latched;
 extern const char *menu_items[];

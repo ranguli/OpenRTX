@@ -187,7 +187,7 @@ typedef struct ui_state_t
 }
 ui_state_t;
 
-extern layout_t layout;
+extern const layout_t layout;
 // Copy of the radio state
 extern state_t last_state;
 extern const char *menu_items[];

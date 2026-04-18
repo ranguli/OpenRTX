@@ -19,38 +19,14 @@
 #include "hwconfig.h"
 #include "ui/ui_events.h"
 #include "ui/Screen.hpp"
+#include "ui/ui_draw.h"
 
+// module17-variant-specific draw functions and helpers
 extern "C" {
-/* UI main screen functions, their implementation is in "ui_main.c" */
-void _ui_drawMainBackground();
-void _ui_drawMainTop();
-void _ui_drawVFOMiddle();
-void _ui_drawMEMMiddle();
-void _ui_drawVFOBottom();
-void _ui_drawMEMBottom();
-void _ui_drawMainVFO(ui_state_t* ui_state);
-void _ui_drawMainVFOInput(ui_state_t* ui_state);
-void _ui_drawMainMEM(ui_state_t* ui_state);
-/* UI menu functions, their implementation is in "ui_menu.c" */
-void _ui_drawMenuTop(ui_state_t* ui_state);
-#ifdef CONFIG_GPS
-void _ui_drawMenuGPS();
-void _ui_drawSettingsGPS(ui_state_t* ui_state);
-#endif
-void _ui_drawMenuSettings(ui_state_t* ui_state);
-void _ui_drawMenuInfo(ui_state_t* ui_state);
-void _ui_drawMenuAbout(ui_state_t* ui_state);
-#ifdef CONFIG_RTC
-void _ui_drawSettingsTimeDate();
-void _ui_drawSettingsTimeDateSet(ui_state_t* ui_state);
-#endif
-void _ui_drawSettingsDisplay(ui_state_t* ui_state);
-void _ui_drawSettingsM17(ui_state_t* ui_state);
+void _ui_drawMainTop();                          // no-arg variant for Module17
 void _ui_drawSettingsModule17(ui_state_t* ui_state);
-void _ui_drawSettingsReset2Defaults(ui_state_t* ui_state);
-bool _ui_drawMacroMenu(ui_state_t* ui_state);
 void state_resetSettingsAndVfo();
-} // extern "C" ui_main / ui_menu
+} // extern "C" module17-specific
 
 const char *menu_items[] =
 {
@@ -148,10 +124,8 @@ const color_t color_grey = {60, 60, 60, 255};
 const color_t color_white = {255, 255, 255, 255};
 const color_t yellow_fab413 = {250, 180, 19, 255};
 
-layout_t layout;
 state_t last_state;
 static ui_state_t ui_state;
-static bool layout_ready = false;
 static Screen *current        = nullptr;
 static Screen *lastMainScreen = nullptr;
 static bool   *gSyncRtx       = nullptr;
@@ -170,7 +144,7 @@ static void _ui_textInputReset(char *buf);
 static void _ui_textInputArrows(char *buf, uint8_t max_len, kbd_msg_t msg);
 static void _ui_textInputConfirm(char *buf);
 
-static layout_t _ui_calculateLayout()
+static constexpr layout_t _ui_calculateLayout()
 {
     // Horizontal line height
     const uint16_t hline_h = 1;
@@ -274,6 +248,8 @@ static layout_t _ui_calculateLayout()
     };
     return new_layout;
 }
+
+const layout_t layout = _ui_calculateLayout();
 
 // ---- Screen subclasses ----
 
@@ -682,8 +658,6 @@ bool SettingsReset2DefaultsScreen::handleInput(event_t ev)
 
 void ui_init()
 {
-    layout = _ui_calculateLayout();
-    layout_ready = true;
     ui_state      = ui_state_t{};
     current        = &vfoScreen;
     lastMainScreen = &vfoScreen;
@@ -910,11 +884,6 @@ void ui_updateFSM(bool *sync_rtx)
 
 bool ui_updateGUI()
 {
-    if(!layout_ready)
-    {
-        layout = _ui_calculateLayout();
-        layout_ready = true;
-    }
     current->render();
 
     return true;

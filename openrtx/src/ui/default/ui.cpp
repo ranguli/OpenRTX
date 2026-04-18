@@ -67,47 +67,23 @@
 #include "core/beeps.h"
 #include "ui/ui_events.h"
 #include "ui/Screen.hpp"
+#include "ui/ui_draw.h"
 
+// default-variant-specific draw functions
 extern "C" {
-/* UI main screen functions, their implementation is in "ui_main.c" */
-void _ui_drawMainBackground();
 void _ui_drawMainTop(ui_state_t* ui_state);
-void _ui_drawVFOMiddle();
-void _ui_drawMEMMiddle();
-void _ui_drawVFOBottom();
-void _ui_drawMEMBottom();
-void _ui_drawMainVFO(ui_state_t* ui_state);
-void _ui_drawMainVFOInput(ui_state_t* ui_state);
-void _ui_drawMainMEM(ui_state_t* ui_state);
-/* UI menu functions, their implementation is in "ui_menu.c" */
-void _ui_drawMenuTop(ui_state_t* ui_state);
 void _ui_drawMenuBank(ui_state_t* ui_state);
 void _ui_drawMenuChannel(ui_state_t* ui_state);
 void _ui_drawMenuContacts(ui_state_t* ui_state);
-#ifdef CONFIG_GPS
-void _ui_drawMenuGPS();
-void _ui_drawSettingsGPS(ui_state_t* ui_state);
-#endif
 void _ui_drawSettingsAccessibility(ui_state_t* ui_state);
-void _ui_drawMenuSettings(ui_state_t* ui_state);
 void _ui_drawMenuBackupRestore(ui_state_t* ui_state);
 void _ui_drawMenuBackup(ui_state_t* ui_state);
 void _ui_drawMenuRestore(ui_state_t* ui_state);
-void _ui_drawMenuInfo(ui_state_t* ui_state);
-void _ui_drawMenuAbout(ui_state_t* ui_state);
-#ifdef CONFIG_RTC
-void _ui_drawSettingsTimeDate();
-void _ui_drawSettingsTimeDateSet(ui_state_t* ui_state);
-#endif
-void _ui_drawSettingsDisplay(ui_state_t* ui_state);
-void _ui_drawSettingsM17(ui_state_t* ui_state);
 void _ui_drawSettingsFM(ui_state_t* ui_state);
 void _ui_drawSettingsVoicePrompts(ui_state_t* ui_state);
-void _ui_drawSettingsReset2Defaults(ui_state_t* ui_state);
 void _ui_drawSettingsRadio(ui_state_t* ui_state);
-bool _ui_drawMacroMenu(ui_state_t* ui_state);
 void _ui_reset_menu_anouncement_tracking();
-} // extern "C" ui_main / ui_menu
+} // extern "C" default-specific
 // TODO: get these from ui strings / currentLanguage
 const char *menu_items[] =
 {
@@ -279,157 +255,155 @@ const color_t color_grey = {60, 60, 60, 255};
 const color_t color_white = {255, 255, 255, 255};
 const color_t yellow_fab413 = {250, 180, 19, 255};
 
-layout_t layout;
 state_t last_state;
 bool macro_latched;
 static ui_state_t ui_state;
 static bool macro_menu = false;
-static bool layout_ready = false;
 static bool redraw_needed = true;
 
 static bool standby = false;
 static long long last_event_tick = 0;
 
-static void _ui_calculateLayout(layout_t *layout)
+static constexpr layout_t _ui_calculateLayout()
 {
     // Horizontal line height
-    static const uint16_t hline_h = 1;
+    const uint16_t hline_h = 1;
     // Compensate for fonts printing below the start position
-    static const uint16_t text_v_offset = 1;
+    const uint16_t text_v_offset = 1;
 
     // Calculate UI layout depending on vertical resolution
     // Tytera MD380, MD-UV380
     #if CONFIG_SCREEN_HEIGHT > 127
 
     // Height and padding shown in diagram at beginning of file
-    static const uint16_t top_h = 16;
-    static const uint16_t top_pad = 4;
-    static const uint16_t line1_h = 20;
-    static const uint16_t line2_h = 20;
-    static const uint16_t line3_h = 20;
-    static const uint16_t line3_large_h = 40;
-    static const uint16_t line4_h = 20;
-    static const uint16_t menu_h = 16;
-    static const uint16_t bottom_h = 23;
-    static const uint16_t bottom_pad = top_pad;
-    static const uint16_t status_v_pad = 2;
-    static const uint16_t small_line_v_pad = 2;
-    static const uint16_t big_line_v_pad = 6;
-    static const uint16_t horizontal_pad = 4;
+    const uint16_t top_h = 16;
+    const uint16_t top_pad = 4;
+    const uint16_t line1_h = 20;
+    const uint16_t line2_h = 20;
+    const uint16_t line3_h = 20;
+    const uint16_t line3_large_h = 40;
+    const uint16_t line4_h = 20;
+    const uint16_t menu_h = 16;
+    const uint16_t bottom_h = 23;
+    const uint16_t bottom_pad = top_pad;
+    const uint16_t status_v_pad = 2;
+    const uint16_t small_line_v_pad = 2;
+    const uint16_t big_line_v_pad = 6;
+    const uint16_t horizontal_pad = 4;
 
     // Top bar font: 8 pt
-    static const fontSize_t   top_font = FONT_SIZE_8PT;
-    static const symbolSize_t top_symbol_size = SYMBOLS_SIZE_8PT;
+    const fontSize_t   top_font = FONT_SIZE_8PT;
+    const symbolSize_t top_symbol_size = SYMBOLS_SIZE_8PT;
     // Text line font: 8 pt
-    static const fontSize_t line1_font = FONT_SIZE_8PT;
-    static const symbolSize_t line1_symbol_size = SYMBOLS_SIZE_8PT;
-    static const fontSize_t line2_font = FONT_SIZE_8PT;
-    static const symbolSize_t line2_symbol_size = SYMBOLS_SIZE_8PT;
-    static const fontSize_t line3_font = FONT_SIZE_8PT;
-    static const symbolSize_t line3_symbol_size = SYMBOLS_SIZE_8PT;
-    static const fontSize_t line4_font = FONT_SIZE_8PT;
-    static const symbolSize_t line4_symbol_size = SYMBOLS_SIZE_8PT;
+    const fontSize_t line1_font = FONT_SIZE_8PT;
+    const symbolSize_t line1_symbol_size = SYMBOLS_SIZE_8PT;
+    const fontSize_t line2_font = FONT_SIZE_8PT;
+    const symbolSize_t line2_symbol_size = SYMBOLS_SIZE_8PT;
+    const fontSize_t line3_font = FONT_SIZE_8PT;
+    const symbolSize_t line3_symbol_size = SYMBOLS_SIZE_8PT;
+    const fontSize_t line4_font = FONT_SIZE_8PT;
+    const symbolSize_t line4_symbol_size = SYMBOLS_SIZE_8PT;
     // Message font
     const fontSize_t message_font = FONT_SIZE_6PT;
     // Frequency line font: 16 pt
-    static const fontSize_t line3_large_font = FONT_SIZE_16PT;
+    const fontSize_t line3_large_font = FONT_SIZE_16PT;
     // Bottom bar font: 8 pt
-    static const fontSize_t bottom_font = FONT_SIZE_8PT;
+    const fontSize_t bottom_font = FONT_SIZE_8PT;
     // TimeDate/Frequency input font
-    static const fontSize_t input_font = FONT_SIZE_12PT;
+    const fontSize_t input_font = FONT_SIZE_12PT;
     // Menu font
-    static const fontSize_t menu_font = FONT_SIZE_8PT;
+    const fontSize_t menu_font = FONT_SIZE_8PT;
 
     // Radioddity GD-77
     #elif CONFIG_SCREEN_HEIGHT > 63
 
     // Height and padding shown in diagram at beginning of file
-    static const uint16_t top_h = 11;
-    static const uint16_t top_pad = 1;
-    static const uint16_t line1_h = 10;
-    static const uint16_t line2_h = 10;
-    static const uint16_t line3_h = 10;
-    static const uint16_t line3_large_h = 16;
-    static const uint16_t line4_h = 10;
-    static const uint16_t menu_h = 10;
-    static const uint16_t bottom_h = 15;
-    static const uint16_t bottom_pad = 0;
-    static const uint16_t status_v_pad = 1;
-    static const uint16_t small_line_v_pad = 1;
-    static const uint16_t big_line_v_pad = 0;
-    static const uint16_t horizontal_pad = 4;
+    const uint16_t top_h = 11;
+    const uint16_t top_pad = 1;
+    const uint16_t line1_h = 10;
+    const uint16_t line2_h = 10;
+    const uint16_t line3_h = 10;
+    const uint16_t line3_large_h = 16;
+    const uint16_t line4_h = 10;
+    const uint16_t menu_h = 10;
+    const uint16_t bottom_h = 15;
+    const uint16_t bottom_pad = 0;
+    const uint16_t status_v_pad = 1;
+    const uint16_t small_line_v_pad = 1;
+    const uint16_t big_line_v_pad = 0;
+    const uint16_t horizontal_pad = 4;
 
     // Top bar font: 6 pt
-    static const fontSize_t   top_font = FONT_SIZE_6PT;
-    static const symbolSize_t top_symbol_size = SYMBOLS_SIZE_6PT;
+    const fontSize_t   top_font = FONT_SIZE_6PT;
+    const symbolSize_t top_symbol_size = SYMBOLS_SIZE_6PT;
     // Middle line fonts: 5, 8, 8 pt
-    static const fontSize_t line1_font = FONT_SIZE_6PT;
-    static const symbolSize_t line1_symbol_size = SYMBOLS_SIZE_6PT;
-    static const fontSize_t line2_font = FONT_SIZE_6PT;
-    static const symbolSize_t line2_symbol_size = SYMBOLS_SIZE_6PT;
-    static const fontSize_t line3_font = FONT_SIZE_6PT;
-    static const symbolSize_t line3_symbol_size = SYMBOLS_SIZE_6PT;
-    static const fontSize_t line3_large_font = FONT_SIZE_10PT;
-    static const fontSize_t line4_font = FONT_SIZE_6PT;
-    static const symbolSize_t line4_symbol_size = SYMBOLS_SIZE_6PT;
+    const fontSize_t line1_font = FONT_SIZE_6PT;
+    const symbolSize_t line1_symbol_size = SYMBOLS_SIZE_6PT;
+    const fontSize_t line2_font = FONT_SIZE_6PT;
+    const symbolSize_t line2_symbol_size = SYMBOLS_SIZE_6PT;
+    const fontSize_t line3_font = FONT_SIZE_6PT;
+    const symbolSize_t line3_symbol_size = SYMBOLS_SIZE_6PT;
+    const fontSize_t line3_large_font = FONT_SIZE_10PT;
+    const fontSize_t line4_font = FONT_SIZE_6PT;
+    const symbolSize_t line4_symbol_size = SYMBOLS_SIZE_6PT;
     // Message font
     const fontSize_t message_font = FONT_SIZE_6PT;
     // Bottom bar font: 6 pt
-    static const fontSize_t bottom_font = FONT_SIZE_6PT;
+    const fontSize_t bottom_font = FONT_SIZE_6PT;
     // TimeDate/Frequency input font
-    static const fontSize_t input_font = FONT_SIZE_8PT;
+    const fontSize_t input_font = FONT_SIZE_8PT;
     // Menu font
-    static const fontSize_t menu_font = FONT_SIZE_6PT;
+    const fontSize_t menu_font = FONT_SIZE_6PT;
 
     // Radioddity RD-5R
     #elif CONFIG_SCREEN_HEIGHT > 47
 
     // Height and padding shown in diagram at beginning of file
-    static const uint16_t top_h = 11;
-    static const uint16_t top_pad = 1;
-    static const uint16_t line1_h = 0;
-    static const uint16_t line2_h = 10;
-    static const uint16_t line3_h = 10;
-    static const uint16_t line3_large_h = 18;
-    static const uint16_t line4_h = 10;
-    static const uint16_t menu_h = 10;
-    static const uint16_t bottom_h = 0;
-    static const uint16_t bottom_pad = 0;
-    static const uint16_t status_v_pad = 1;
-    static const uint16_t small_line_v_pad = 1;
-    static const uint16_t big_line_v_pad = 0;
-    static const uint16_t horizontal_pad = 4;
+    const uint16_t top_h = 11;
+    const uint16_t top_pad = 1;
+    const uint16_t line1_h = 0;
+    const uint16_t line2_h = 10;
+    const uint16_t line3_h = 10;
+    const uint16_t line3_large_h = 18;
+    const uint16_t line4_h = 10;
+    const uint16_t menu_h = 10;
+    const uint16_t bottom_h = 0;
+    const uint16_t bottom_pad = 0;
+    const uint16_t status_v_pad = 1;
+    const uint16_t small_line_v_pad = 1;
+    const uint16_t big_line_v_pad = 0;
+    const uint16_t horizontal_pad = 4;
 
     // Top bar font: 6 pt
-    static const fontSize_t   top_font = FONT_SIZE_6PT;
-    static const symbolSize_t top_symbol_size = SYMBOLS_SIZE_6PT;
+    const fontSize_t   top_font = FONT_SIZE_6PT;
+    const symbolSize_t top_symbol_size = SYMBOLS_SIZE_6PT;
     // Middle line fonts: 16, 16
-    static const fontSize_t line2_font = FONT_SIZE_6PT;
-    static const fontSize_t line3_font = FONT_SIZE_6PT;
-    static const fontSize_t line4_font = FONT_SIZE_6PT;
-    static const fontSize_t line3_large_font = FONT_SIZE_12PT;
+    const fontSize_t line2_font = FONT_SIZE_6PT;
+    const fontSize_t line3_font = FONT_SIZE_6PT;
+    const fontSize_t line4_font = FONT_SIZE_6PT;
+    const fontSize_t line3_large_font = FONT_SIZE_12PT;
     // TimeDate/Frequency input font
-    static const fontSize_t input_font = FONT_SIZE_8PT;
+    const fontSize_t input_font = FONT_SIZE_8PT;
     // Menu font
-    static const fontSize_t menu_font = FONT_SIZE_6PT;
+    const fontSize_t menu_font = FONT_SIZE_6PT;
     // Message font
     const fontSize_t message_font = FONT_SIZE_6PT;
     // Not present on this resolution
-    static const fontSize_t line1_font = 0;
-    static const fontSize_t bottom_font = 0;
+    const fontSize_t line1_font = 0;
+    const fontSize_t bottom_font = 0;
 
     #else
     #error Unsupported vertical resolution!
     #endif
 
     // Calculate printing positions
-    static const uint16_t top_pos   = top_h - status_v_pad - text_v_offset;
-    static const uint16_t line1_pos = top_h + top_pad + line1_h - small_line_v_pad - text_v_offset;
-    static const uint16_t line2_pos = top_h + top_pad + line1_h + line2_h - small_line_v_pad - text_v_offset;
-    static const uint16_t line3_pos = top_h + top_pad + line1_h + line2_h + line3_h - small_line_v_pad - text_v_offset;
-    static const uint16_t line4_pos = top_h + top_pad + line1_h + line2_h + line3_h + line4_h - small_line_v_pad - text_v_offset;
-    static const uint16_t line3_large_pos = top_h + top_pad + line1_h + line2_h + line3_large_h - big_line_v_pad - text_v_offset;
-    static const uint16_t bottom_pos = CONFIG_SCREEN_HEIGHT - bottom_pad - status_v_pad - text_v_offset;
+    const uint16_t top_pos   = top_h - status_v_pad - text_v_offset;
+    const uint16_t line1_pos = top_h + top_pad + line1_h - small_line_v_pad - text_v_offset;
+    const uint16_t line2_pos = top_h + top_pad + line1_h + line2_h - small_line_v_pad - text_v_offset;
+    const uint16_t line3_pos = top_h + top_pad + line1_h + line2_h + line3_h - small_line_v_pad - text_v_offset;
+    const uint16_t line4_pos = top_h + top_pad + line1_h + line2_h + line3_h + line4_h - small_line_v_pad - text_v_offset;
+    const uint16_t line3_large_pos = top_h + top_pad + line1_h + line2_h + line3_large_h - big_line_v_pad - text_v_offset;
+    const uint16_t bottom_pos = CONFIG_SCREEN_HEIGHT - bottom_pad - status_v_pad - text_v_offset;
 
     layout_t new_layout =
     {
@@ -470,8 +444,10 @@ static void _ui_calculateLayout(layout_t *layout)
         message_font
     };
 
-    memcpy(layout, &new_layout, sizeof(layout_t));
+    return new_layout;
 }
+
+const layout_t layout = _ui_calculateLayout();
 
 static void _ui_drawLowBatteryScreen()
 {
@@ -2408,8 +2384,6 @@ void ui_init()
 {
     last_event_tick = getTick();
     redraw_needed = true;
-    _ui_calculateLayout(&layout);
-    layout_ready = true;
     ui_state = ui_state_t{};
 }
 
@@ -2643,11 +2617,6 @@ bool ui_updateGUI()
     if(redraw_needed == false)
         return false;
 
-    if(!layout_ready)
-    {
-        _ui_calculateLayout(&layout);
-        layout_ready = true;
-    }
     current->render();
 
     // If MACRO menu is active draw it
