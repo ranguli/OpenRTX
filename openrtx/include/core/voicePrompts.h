@@ -7,12 +7,12 @@
 #ifndef VOICEPROMPTS_H
 #define VOICEPROMPTS_H
 
+#include "core/datatypes.h"
+#include <stdbool.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include "core/datatypes.h"
-#include <stdbool.h>
 
 /**
  * List of voice prompts for spoken words or phrases which are not in the UI

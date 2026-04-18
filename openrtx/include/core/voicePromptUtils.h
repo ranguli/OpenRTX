@@ -7,13 +7,13 @@
 #ifndef VOICE_PROMPT_UTILS_H
 #define VOICE_PROMPT_UTILS_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "core/cps.h"
 #include "ui/ui_strings.h"
 #include "core/voicePrompts.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
 Please Note!

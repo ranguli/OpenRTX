@@ -2155,7 +2155,6 @@ bool SettingsM17Screen::handleInput(event_t ev)
     if(ev.type != EVENT_KBD) return true;
     kbd_msg_t msg;
     msg.value = ev.payload;
-    vpQueueFlags_t queueFlags = vp_getVoiceLevelQueueFlags();
 
     if(ui_state.edit_mode)
     {
@@ -2545,8 +2544,6 @@ void ui_updateFSM(bool *sync_rtx)
     {
         kbd_msg_t msg;
         msg.value = event.payload;
-        bool f1Handled = false;
-        vpQueueFlags_t queueFlags = vp_getVoiceLevelQueueFlags();
         // If we get out of standby, we ignore the kdb event
         // unless is the MONI key for the MACRO functions
         if (_ui_exitStandby(now) && !(msg.keys & KEY_MONI))
