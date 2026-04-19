@@ -27,8 +27,9 @@ Single test:
     python scripts/run_e2e.py tests/e2e/main_menu.txt --binary ./build/bin
 
 Environment:
-    UPDATE_GOLDEN=1  -- overwrite golden images with current output
-    TOLERANCE=0      -- max differing pixels before failure (default: 0)
+    UPDATE_GOLDEN=1     -- overwrite golden images with current output
+    TOLERANCE=0         -- max differing pixels before failure (default: 0)
+    CHANNEL_TOLERANCE=1 -- max per-channel delta ignored per pixel (default: 1)
 """
 
 import argparse
@@ -52,11 +53,15 @@ VARIANTS = {
 }
 
 
-def compare_images(actual_path, golden_path):
-    """Compare two images pixel-by-pixel, return count of differing
-    pixels."""
-    actual = Image.open(actual_path)
-    golden = Image.open(golden_path)
+def compare_images(actual_path, golden_path, channel_tolerance=1):
+    """Compare two images pixel-by-pixel, return count of differing pixels.
+
+    Pixels whose every channel differs by at most channel_tolerance are
+    considered identical.  This absorbs the ±1 rounding error that arises
+    from converting the display's 16-bit (5:6:5) pixel values to 8-bit RGB.
+    """
+    actual = Image.open(actual_path).convert("RGB")
+    golden = Image.open(golden_path).convert("RGB")
 
     if actual.size != golden.size:
         raise ValueError(
@@ -70,10 +75,12 @@ def compare_images(actual_path, golden_path):
         return 0
 
     # Count differing pixels by comparing per-pixel chunks
-    bpp = len(actual_data) // (actual.size[0] * actual.size[1])
     diff_count = 0
-    for i in range(0, len(actual_data), bpp):
-        if actual_data[i : i + bpp] != golden_data[i : i + bpp]:
+    for i in range(0, len(actual_data), 3):
+        if any(
+            abs(actual_data[i + c] - golden_data[i + c]) > channel_tolerance
+            for c in range(3)
+        ):
             diff_count += 1
 
     return diff_count
@@ -106,7 +113,8 @@ def resolve_base_name(script_name, variant):
     return script_name
 
 
-def run_test(script_path, binary, variant, tolerance, update_golden):
+def run_test(script_path, binary, variant, tolerance, channel_tolerance,
+             update_golden):
     """Run a single e2e test.  Returns True on success."""
     test_name = script_path.stem
     base_name = resolve_base_name(test_name, variant)
@@ -200,7 +208,7 @@ def run_test(script_path, binary, variant, tolerance, update_golden):
                 continue
 
             try:
-                diff_pixels = compare_images(actual, golden)
+                diff_pixels = compare_images(actual, golden, channel_tolerance)
             except Exception as e:
                 print(f"  FAIL: {name} -- comparison error: {e}")
                 failures += 1
@@ -308,10 +316,11 @@ def main():
     args = parser.parse_args()
 
     tolerance = int(os.environ.get("TOLERANCE", "0"))
+    channel_tolerance = int(os.environ.get("CHANNEL_TOLERANCE", "1"))
     update_golden = os.environ.get("UPDATE_GOLDEN") == "1"
 
     if args.all or not args.test_script:
-        return run_all(args, tolerance, update_golden)
+        return run_all(args, tolerance, channel_tolerance, update_golden)
 
     script_path = Path(args.test_script).resolve()
     build_dir = Path(args.build_dir).resolve()
@@ -331,12 +340,13 @@ def main():
         sys.exit(1)
 
     ok = run_test(
-        script_path, binary, args.variant, tolerance, update_golden
+        script_path, binary, args.variant, tolerance, channel_tolerance,
+        update_golden
     )
     sys.exit(0 if ok else 1)
 
 
-def run_all(args, tolerance, update_golden):
+def run_all(args, tolerance, channel_tolerance, update_golden):
     """Discover and run every e2e test."""
     build_dir = Path(args.build_dir).resolve()
     check_prerequisites()
@@ -358,7 +368,8 @@ def run_all(args, tolerance, update_golden):
             print(f"{label} ... SKIP (binary not found: {binary})")
             continue
 
-        ok = run_test(script, binary, variant, tolerance, update_golden)
+        ok = run_test(script, binary, variant, tolerance, channel_tolerance,
+                      update_golden)
         if ok:
             passed += 1
         else:
