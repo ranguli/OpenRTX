@@ -1,0 +1,197 @@
+{\rtf1\ansi\deff0
+{\fonttbl
+  {\f0\froman\fcharset0 Times New Roman;}
+  {\f1\fmodern\fcharset0 Courier New;}
+}
+{\colortbl;\red0\green0\blue0;\red80\green80\blue80;}
+\f0\fs24
+
+{\fs36\b UI Refactor Plan}\line
+OpenRTX \emdash  April 2026\line
+\line
+
+{\fs28\b Decision: Rework (Option B)}\line
+\line
+The graphics HAL, display/keyboard drivers, threading model, and platform abstraction are sound. The problem is concentrated in {\f1 ui.c} (2,778 lines) and its parallel {\f1 module17/ui.c} clone. Rewriting from scratch risks regressions across 9 display drivers and 8 keyboard targets with no incremental validation path. The pain points are surgical and addressable without replacing the rendering pipeline.\line
+\line
+The UI will be rewritten in C++ to match the existing {\f1 OpMode} hierarchy pattern already used in {\f1 rtx.cpp}. The UI is currently the only major pure-C subsystem; this change makes it consistent with the radio layer.\line
+\line
+
+{\fs28\b What Stays Untouched}\line
+\line
+The following are not touched by this refactor:\line
+\line
+\bullet  All display drivers\line
+\bullet  All keyboard drivers\line
+\bullet  {\f1 graphics.c} / {\f1 graphics.h}\line
+\bullet  The three-thread model (main, ui, rtx)\line
+\bullet  The Linux SDL2 emulator\line
+\bullet  The {\f1 display.h} / {\f1 keyboard.h} HAL interfaces\line
+\line
+
+{\fs28\b Current Architecture Pain Points}\line
+\line
+{\b 1. Monolithic FSM} \emdash  {\f1 ui_updateFSM()} is ~1,200 lines of deeply nested switch/if/else with platform guards interspersed. Adding a screen requires touching this function, {\f1 ui_updateGUI()}, the {\f1 uiScreen} enum, and likely {\f1 ui_menu.c} or {\f1 ui_main.c}.\line
+\line
+{\b 2. {\f1 state.ui_screen} in shared global state} \emdash  The current screen enum lives in {\f1 state_t}, shared under mutex with the radio and device threads. Screen transitions and radio frequency are coupled in the same lock domain.\line
+\line
+{\b 3. Two parallel, nearly-identical UI variants} \emdash  {\f1 default/} and {\f1 module17/} each duplicate the entire FSM, event queue, layout engine, and most draw functions. A bug fix in one must be manually propagated to the other.\line
+\line
+{\b 4. Hard-coded menu strings} \emdash  {\f1 menu_items[]}, {\f1 settings_items[]}, etc. in {\f1 ui.c} are C string literals separate from the {\f1 stringsTable_t} i18n system. There is even an inline TODO at line 107 acknowledging this.\line
+\line
+{\b 5. Compile-time layout via runtime {\f1 \#if} ladders} \emdash  {\f1 _ui_calculateLayout()} has three {\f1 \#if CONFIG_SCREEN_HEIGHT > N} branches with fully duplicated variable declarations. The values are entirely compile-time constants and could be {\f1 static const} tables.\line
+\line
+{\b 6. Platform key bindings inside the FSM} \emdash  {\f1 \#if defined(PLATFORM_TTWRPLUS)} key remapping is scattered through FSM case arms, coupling platform identity directly into UI logic.\line
+\line
+{\b 7. Voice prompt coupling} \emdash  {\f1 vp_announce*()} calls are sprinkled throughout every FSM case arm, interleaved with state mutations, making the FSM hard to read in isolation.\line
+\line
+{\b 8. Event queue not thread-safe by contract} \emdash  {\f1 ui_pushEvent()} is in the public {\f1 ui.h} API with no mutex. Any future cross-thread event push would be a silent data race.\line
+\line
+{\b 9. {\f1 ui_terminate()} is empty} \emdash  The body is literally empty (lines 2776\endash 2778).\line
+\line
+
+{\fs28\b Phase 1 \emdash  Shared Infrastructure Foundation}\line
+\line
+{\i Goal: eliminate parallel variant duplication at the infrastructure level.}\line
+\line
+1. Create {\f1 openrtx/src/ui/common/} and {\f1 openrtx/include/ui/common/}.\line
+\line
+2. Merge {\f1 ui_default.h} and {\f1 ui_mod17.h} into a single {\f1 ui_screen.h} with a shared {\f1 enum uiScreen} base and variant-specific screen additions via {\f1 \#include "ui_screen_<variant>.h"}. Single {\f1 ui_state_t} definition.\line
+\line
+3. Move the event queue ({\f1 evQueue[]}, {\f1 ui_pushEvent()}, ring-buffer logic) into {\f1 common/ui_events.cpp} with an internal mutex so cross-thread pushes are safe.\line
+\line
+4. Move the {\f1 ui_threadFunc} loop skeleton into {\f1 common/ui_thread.cpp}. Both variants plug in via the {\f1 Screen*} pointer rather than variant-specific function calls.\line
+\line
+{\b Outcome:} One copy of the event queue and thread loop; both variants use it.\line
+\line
+
+{\fs28\b Phase 2 \emdash  C++ Virtual Screen Abstraction}\line
+\line
+{\i Goal: decompose the 1,200-line monolithic FSM into per-screen C++ classes, mirroring the existing OpMode hierarchy.}\line
+\line
+{\b Base class} ({\f1 openrtx/include/ui/Screen.hpp}):\line
+\line
+{\f1
+class Screen \{\line
+public:\line
+    virtual void enter() \{\}\line
+    virtual void exit()  \{\}\line
+    virtual bool handleInput(event_t ev) = 0;\line
+    virtual void render() = 0;\line
+    virtual ~Screen() = default;\line
+\};\line
+}\line
+\line
+No RTTI, no exceptions, no {\f1 dynamic_cast} \emdash  identical constraints to {\f1 OpMode}. The pure virtuals enforce that every concrete screen implements both responsibilities.\line
+\line
+{\b Concrete screens} ({\f1 openrtx/src/ui/screens/}):\line
+\line
+One {\f1 .cpp} file per screen. Logic and rendering co-located. No file needs to know about any other screen's internals. Example:\line
+\line
+{\f1
+class VfoScreen : public Screen \{\line
+public:\line
+    bool handleInput(event_t ev) override;\line
+    void render() override;\line
+private:\line
+    // screen-local transient state only\line
+\};\line
+}\line
+\line
+{\b Stack-allocated instances + raw pointer dispatch} (same pattern as {\f1 rtx.cpp}):\line
+\line
+{\f1
+static VfoScreen     vfoScreen;\line
+static MenuTopScreen menuScreen;\line
+static GpsScreen     gpsScreen;\line
+\line
+static Screen *current = &vfoScreen;\line
+\line
+static void transition(Screen *next) \{\line
+    current->exit();\line
+    next->enter();\line
+    current = next;\line
+\}\line
+}\line
+\line
+No heap. No {\f1 new}. Instances live for the program lifetime, same as today's static op-mode instances.\line
+\line
+{\b Dispatchers collapse to two lines each:}\line
+\line
+{\f1
+void ui_updateFSM(event_t ev) \{ current->handleInput(ev); \}\line
+void ui_updateGUI()           \{ current->render(); \}\line
+}\line
+\line
+{\b Screen enum goes away entirely} \emdash  {\f1 state.ui_screen} is removed from {\f1 state_t}. The current screen is represented by the {\f1 current} pointer type, not an integer. This removes UI navigation state from the radio-shared mutex domain.\line
+\line
+{\b Outcome:} Adding a screen = one new {\f1 .cpp} file + one static instance + one {\f1 transition()} call site. The FSM monolith is gone.\line
+\line
+
+{\fs28\b Phase 3 \emdash  Unify the Two UI Variants}\line
+\line
+{\i Goal: default/ and module17/ share all common screens; only divergent screens are variant-specific.}\line
+\line
+1. Audit which screens are shared (VFO main, GPS, contacts, most settings) vs. variant-specific (Module17 calibration screens; FM radio screens in default).\line
+\line
+2. Move shared screen {\f1 .cpp} files into {\f1 common/screens/}.\line
+\line
+3. Variant directories ({\f1 default/screens/}, {\f1 module17/screens/}) contain only the screens that differ.\line
+\line
+4. Build system picks up {\f1 common/screens/*.cpp} + {\f1 \$\{VARIANT\}/screens/*.cpp}.\line
+\line
+5. Merge string tables \emdash  one copy of {\f1 ui_strings.c}, {\f1 EnglishStrings.h}, {\f1 SpanishStrings.h} used by both variants.\line
+\line
+{\b Outcome:} A bug fix in the VFO screen applies to both variants automatically.\line
+\line
+
+{\fs28\b Phase 4 \emdash  Fix the Layout System}\line
+\line
+{\i Goal: eliminate the runtime \#if ladder and make layout a compile-time constant.}\line
+\line
+1. Replace {\f1 _ui_calculateLayout()} with three {\f1 static const layout_t} entries selected by a compile-time {\f1 \#if} on {\f1 CONFIG_SCREEN_HEIGHT}. The function is called once at startup and the values never change \emdash  they are effectively constants.\line
+\line
+2. Remove {\f1 layout} from mutable global state.\line
+\line
+3. Add a {\f1 _Static_assert} (or {\f1 static_assert} in C++) that {\f1 CONFIG_SCREEN_HEIGHT} matches one of the three tiers rather than a silent {\f1 \#error}.\line
+\line
+{\b Outcome:} ~180 lines of duplicated conditional declarations become a simple initializer. No runtime cost.\line
+\line
+
+{\fs28\b Phase 5 \emdash  Peripheral Fixes}\line
+\line
+{\i Goal: address the remaining structural warts.}\line
+\line
+{\b String table:} Move all {\f1 menu_items[]}, {\f1 settings_items[]} literals from {\f1 ui.c} into {\f1 stringsTable_t}. Fulfills the existing TODO at line 107, makes strings localizable.\line
+\line
+{\b Platform key bindings:} Move {\f1 \#if defined(PLATFORM_TTWRPLUS)} key remapping from FSM case arms into the relevant platform keyboard driver. The FSM sees normalized keys only.\line
+\line
+{\b Voice prompt decoupling:} Add an {\f1 announce()} virtual method to {\f1 Screen} (with a default no-op implementation). Call it from {\f1 transition()} rather than sprinkling {\f1 vp_announce*()} throughout {\f1 handleInput()} implementations.\line
+\line
+{\b {\f1 _ui_handleToneSelectScroll}:} Move to {\f1 rtx.cpp} or a dedicated {\f1 ui_radio_helpers.cpp}. It manipulates radio state, not UI state.\line
+\line
+{\b {\f1 ui_terminate()}:} Implement \emdash  flush event queue, save settings, call {\f1 gfx_terminate()}.\line
+\line
+{\b Event queue mutex:} Add an internal mutex to {\f1 ui_pushEvent()} so the public API is safe to call from any thread.\line
+\line
+
+{\fs28\b Phase Order Rationale}\line
+\line
+Phases must be executed in order:\line
+\line
+\bullet  Phase 1 provides the shared foundation before splitting into per-screen files.\line
+\bullet  Phase 2 creates per-screen files before variants can meaningfully be unified.\line
+\bullet  Phase 3 depends on Phase 2 having established the screen file structure.\line
+\bullet  Phases 4 and 5 are independent of each other but depend on Phase 2 (no point fixing layout in the old monolith).\line
+\line
+Each phase is independently mergeable with the radio stack running throughout. No big-bang cutover required.\line
+\line
+
+{\fs28\b C++ Constraints}\line
+\line
+The project targets {\b C++14} across all platforms ({\f1 -std=c++14} in all cross and native build files). The following C++17 features are {\b not} available without a build system change: structured bindings, {\f1 if constexpr}, {\f1 std::optional}, {\f1 std::variant}.\line
+\line
+RTTI is disabled on embedded targets ({\f1 -fno-rtti}). Do not use {\f1 dynamic_cast} or {\f1 typeid}. Exceptions are disabled. Do not use {\f1 try}/{\f1 catch}/{\f1 throw}.\line
+\line
+Heap allocation is permitted at init/teardown boundaries (consistent with existing {\f1 std::make_unique} usage in Modulator/Demodulator) but must not occur in the UI hot path (25 Hz render loop).\line
+}

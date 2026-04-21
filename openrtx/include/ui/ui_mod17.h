@@ -7,24 +7,13 @@
 #ifndef UI_MOD17_H
 #define UI_MOD17_H
 
-#include <stdbool.h>
+#include "ui/ui_common.h"
 #include "core/state.h"
-#include "core/graphics.h"
 #include "interfaces/keyboard.h"
 #include "calibration/calibInfo_Mod17.h"
-#include <stdint.h>
 #include "core/event.h"
 #include "hwconfig.h"
 #include "core/ui.h"
-
-// Maximum menu entry length
-#define MAX_ENTRY_LEN 21
-// Frequency digits
-#define FREQ_DIGITS 7
-// Time & Date digits
-#define TIMEDATE_DIGITS 10
-// Max number of UI events
-#define MAX_NUM_EVENTS 16
 
 enum uiScreen
 {
@@ -54,12 +43,6 @@ enum uiScreen
     LOW_BAT
 };
 
-enum SetRxTx
-{
-    SET_RX = 0,
-    SET_TX
-};
-
 // This enum is needed to have item numbers that match
 // menu elements even if some elements may be missing (GPS)
 enum menuItems
@@ -85,12 +68,6 @@ enum settingsItems
     ,S_M17
     ,S_MOD17
     ,S_RESET2DEFAULTS
-};
-
-enum backupRestoreItems
-{
-    BR_BACKUP = 0,
-    BR_RESTORE
 };
 
 enum displayItems
@@ -210,7 +187,7 @@ typedef struct ui_state_t
 }
 ui_state_t;
 
-extern layout_t layout;
+extern const layout_t layout;
 // Copy of the radio state
 extern state_t last_state;
 extern const char *menu_items[];
@@ -231,11 +208,6 @@ extern const uint8_t m17_num;
 extern const uint8_t module17_num;
 extern const uint8_t info_num;
 extern const uint8_t author_num;
-extern const color_t color_black;
-extern const color_t color_grey;
-extern const color_t color_white;
-extern const color_t yellow_fab413;
-
 // Calibration data, for digital pot and phase inversion
 extern mod17Calib_t mod17CalData;
 
