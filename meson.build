@@ -34,6 +34,7 @@ openrtx_def += {'FONT_UBUNTU_REGULAR': ''}
 ##
 
 openrtx_src = ['openrtx/src/core/state.c',
+               'openrtx/src/core/settings.c',
                'openrtx/src/core/threads.c',
                'openrtx/src/core/battery.c',
                'openrtx/src/core/graphics.c',
@@ -78,7 +79,20 @@ openrtx_inc = ['openrtx/include', 'platform']
 ui_src_default = ['openrtx/src/ui/default/ui.c',
                   'openrtx/src/ui/default/ui_main.c',
                   'openrtx/src/ui/default/ui_menu.c',
-                  'openrtx/src/ui/default/ui_strings.c']
+                  'openrtx/src/ui/default/ui_strings.c',
+                  'openrtx/src/ui/new/ui.c',
+                  'openrtx/src/ui/new/ui_core.c',
+                  'openrtx/src/ui/new/ui_compat.c',
+                  'openrtx/src/ui/new/ui_gps.c',
+                  'openrtx/src/ui/new/ui_menu.c',
+                  'openrtx/src/ui/new/ui_menu_tree.c',
+                  'openrtx/src/ui/new/ui_settings_display.c',
+                  'openrtx/src/ui/new/ui_settings_gps.c',
+                  'openrtx/src/ui/new/ui_settings_radio.c',
+                  'openrtx/src/ui/new/ui_settings_m17.c',
+                  'openrtx/src/ui/new/ui_settings_fm.c',
+                  'openrtx/src/ui/new/ui_settings_accessibility.c',
+                  'openrtx/src/ui/new/ui_textedit.c']
 
 ui_src_module17 = ['openrtx/src/ui/module17/ui.c',
                    'openrtx/src/ui/module17/ui_main.c',
@@ -356,7 +370,7 @@ linux_l_args   = ['-lm', '-lreadline']
 if build_machine.system() == 'darwin'
   linux_l_args += '-Wl,-dead_strip'
 else
-  linux_l_args += '-Wl,--gc-sections'
+  #linux_l_args += '-Wl,--gc-sections'
 endif
 
 # Add AddressSanitizer if required
@@ -799,7 +813,8 @@ cs7000p_opts = {
   'c_args'             : cs7000p_args,
   'cpp_args'           : cs7000p_args,
   'link_args'          : ['-Wl,-T../platform/mcu/STM32H7xx/linker_script_cs7000p.ld',
-                          '-Wl,--print-memory-usage']
+                          '-Wl,--print-memory-usage',
+                          '-Wl,-Map=firmware.map']
 }
 
 dm1701_opts = {

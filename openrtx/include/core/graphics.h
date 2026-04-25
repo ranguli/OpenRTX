@@ -55,6 +55,17 @@ typedef struct point_t
 } point_t;
 
 /**
+ * Structure that represents the X,Y coordinates, width and height of a rectangle.
+ */
+typedef struct
+{
+    int16_t  x;
+    int16_t  y;
+    uint16_t w;
+    uint16_t h;
+} gfx_rect_t;
+
+/**
  * Structure that represents a single color in the RGB 8 bit per channel format
  */
 typedef struct color_t
@@ -92,6 +103,19 @@ typedef enum
     TEXT_ALIGN_RIGHT
 } textAlign_t;
 
+typedef enum
+{
+    TEXT_VALIGN_TOP = 0,
+    TEXT_VALIGN_MIDDLE,
+    TEXT_VALIGN_BOTTOM
+} textValign_t;
+
+typedef struct
+{
+    uint8_t ascent;      // pixels above baseline
+    uint8_t descent;     // pixels below baseline
+    uint8_t line_height; // ascent + descent
+} gfx_font_metrics_t;
 
 /**
  * This function calls the correspondent method of the low level interface display.h
@@ -186,6 +210,8 @@ void gfx_drawVLine(int16_t x, uint16_t width, color_t color);
 void gfx_drawRect(point_t start, uint16_t width, uint16_t height, color_t color,
                   bool fill);
 
+void gfx_drawRectRect(gfx_rect_t rect, color_t color, bool fill);
+
 /**
  * Draw the outline of a circle of specified radius and color.
  * @param start: screen position of the center of the circle, in pixels
@@ -200,6 +226,18 @@ void gfx_drawCircle(point_t start, uint16_t r, color_t color);
  * @return font height
  */
 uint8_t gfx_getFontHeight(fontSize_t size);
+
+/**
+ * Get font metrics for a given font
+ */
+void gfx_getFontMetrics(fontSize_t size, gfx_font_metrics_t *out);
+
+/**
+ * Measure text
+ * @param size: text font size, defined as enum.
+ * @return text width and height as point_t coordinates
+ */
+point_t gfx_textSize(fontSize_t size, const char *buf);
 
 /**
  * Prints text on the screen at the specified coordinates.
@@ -243,6 +281,13 @@ point_t gfx_print(point_t start, fontSize_t size, textAlign_t alignment,
 point_t gfx_printLine(uint8_t cur, uint8_t tot, int16_t startY, int16_t endY,
                       int16_t startX, fontSize_t size, textAlign_t alignment,
                       color_t color, const char* fmt, ... );
+
+point_t gfx_drawTextRect(gfx_rect_t rect,
+                         fontSize_t size,
+                         textAlign_t halign,
+                         textValign_t valign,
+                         color_t color,
+                         const char *buf);
 
 /**
  * Prints an error message surrounded by a red box on the screen.
