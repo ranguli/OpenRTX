@@ -576,11 +576,12 @@ dm1701_def += openrtx_def + stm32f405_def
 ##
 
 linux_c_args         = linux_c_args
-linux_cpp_args       = linux_cpp_args
+linux_base_cpp_args  = linux_cpp_args
+linux_cpp_args       = linux_base_cpp_args + ['-include', 'ui/layouts/LayoutLarge.h']
 linux_small_c_args   = linux_c_args
-linux_small_cpp_args = linux_cpp_args
+linux_small_cpp_args = linux_base_cpp_args + ['-include', 'ui/layouts/LayoutMedium.h']
 linux_mod17_c_args   = linux_c_args
-linux_mod17_cpp_args = linux_cpp_args
+linux_mod17_cpp_args = linux_base_cpp_args + ['-include', 'ui/layouts/LayoutMedium.h']
 
 foreach k, v : linux_default_def
   if v == ''
@@ -612,7 +613,7 @@ foreach k, v : linux_mod17_def
   endif
 endforeach
 
-md3x0_args = []
+md3x0_args = ['-include', 'ui/layouts/LayoutLarge.h']
 foreach k, v : md3x0_def
   if v == ''
     md3x0_args += '-D@0@'.format(k)
@@ -621,7 +622,7 @@ foreach k, v : md3x0_def
   endif
 endforeach
 
-mduv3x0_args = []
+mduv3x0_args = ['-include', 'ui/layouts/LayoutLarge.h']
 foreach k, v : mduv3x0_def
   if v == ''
     mduv3x0_args += '-D@0@'.format(k)
@@ -630,7 +631,7 @@ foreach k, v : mduv3x0_def
   endif
 endforeach
 
-gd77_args = []
+gd77_args = ['-include', 'ui/layouts/LayoutMedium.h']
 foreach k, v : gd77_def
   if v == ''
     gd77_args += '-D@0@'.format(k)
@@ -639,7 +640,7 @@ foreach k, v : gd77_def
   endif
 endforeach
 
-dm1801_args = []
+dm1801_args = ['-include', 'ui/layouts/LayoutMedium.h']
 foreach k, v : dm1801_def
   if v == ''
     dm1801_args += '-D@0@'.format(k)
@@ -648,7 +649,7 @@ foreach k, v : dm1801_def
   endif
 endforeach
 
-md9600_args = []
+md9600_args = ['-include', 'ui/layouts/LayoutMedium.h']
 foreach k, v : md9600_def
   if v == ''
     md9600_args += '-D@0@'.format(k)
@@ -657,7 +658,7 @@ foreach k, v : md9600_def
   endif
 endforeach
 
-mod17_args = []
+mod17_args = ['-include', 'ui/layouts/LayoutMedium.h']
 foreach k, v : mod17_def
   if v == ''
     mod17_args += '-D@0@'.format(k)
@@ -666,7 +667,7 @@ foreach k, v : mod17_def
   endif
 endforeach
 
-cs7000_args = []
+cs7000_args = ['-include', 'ui/layouts/LayoutLarge.h']
 foreach k, v : cs7000_def
   if v == ''
     cs7000_args += '-D@0@'.format(k)
@@ -675,7 +676,7 @@ foreach k, v : cs7000_def
   endif
 endforeach
 
-cs7000p_args = []
+cs7000p_args = ['-include', 'ui/layouts/LayoutLarge.h']
 foreach k, v : cs7000p_def
   if v == ''
     cs7000p_args += '-D@0@'.format(k)
@@ -684,7 +685,7 @@ foreach k, v : cs7000p_def
   endif
 endforeach
 
-dm1701_args = []
+dm1701_args = ['-include', 'ui/layouts/LayoutLarge.h']
 foreach k, v : dm1701_def
   if v == ''
     dm1701_args += '-D@0@'.format(k)

@@ -151,50 +151,9 @@ enum settingsFMItems
     CTCSS_Enabled
 };
 
-/**
- * Struct containing a set of positions and sizes that get
- * calculated for the selected display size.
- * Using these parameters make the UI automatically adapt
- * To displays of different sizes
- */
-typedef struct layout_t
-{
-    uint16_t hline_h;
-    uint16_t top_h;
-    uint16_t line1_h;
-    uint16_t line2_h;
-    uint16_t line3_h;
-    uint16_t line3_large_h;
-    uint16_t line4_h;
-    uint16_t menu_h;
-    uint16_t bottom_h;
-    uint16_t bottom_pad;
-    uint16_t status_v_pad;
-    uint16_t horizontal_pad;
-    uint16_t text_v_offset;
-    point_t top_pos;
-    point_t line1_pos;
-    point_t line2_pos;
-    point_t line3_pos;
-    point_t line3_large_pos;
-    point_t line4_pos;
-    point_t bottom_pos;
-    fontSize_t top_font;
-    symbolSize_t top_symbol_size;
-    fontSize_t line1_font;
-    symbolSize_t line1_symbol_size;
-    fontSize_t line2_font;
-    symbolSize_t line2_symbol_size;
-    fontSize_t line3_font;
-    symbolSize_t line3_symbol_size;
-    fontSize_t line3_large_font;
-    fontSize_t line4_font;
-    symbolSize_t line4_symbol_size;
-    fontSize_t bottom_font;
-    fontSize_t input_font;
-    fontSize_t menu_font;
-    fontSize_t message_font;
-} layout_t;
+#ifdef __cplusplus
+#include "ui/DisplayLayout.h"
+#endif
 
 /**
  * This structs contains state variables internal to the
@@ -237,7 +196,9 @@ typedef struct ui_state_t
 }
 ui_state_t;
 
-extern layout_t layout;
+#ifdef __cplusplus
+extern const DisplayLayout::Metrics layout;
+#endif
 extern state_t last_state;
 extern bool    macro_latched;
 extern const char *menu_items[];
